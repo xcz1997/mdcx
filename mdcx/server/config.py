@@ -43,7 +43,7 @@ class Config(BaseSettings):
                     # todo 考虑任何情况下都不允许监听非本地地址, 必须使用 reverse proxy
                 )
             if not self.api_key_:
-                self.api_key_ = "test"
+                self.api_key_ = "xczxx"
             if not self.safe_dirs:
                 self.safe_dirs = "~"
 

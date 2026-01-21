@@ -180,3 +180,9 @@ Log/
 # dev files
 dev/
 *.ipynb
+
+# Claude Code / OpenSpec
+.claude/
+openspec/
+CLAUDE.md
+AGENTS.md

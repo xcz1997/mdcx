@@ -31,7 +31,7 @@ from .enums import (
     Translator,
     Website,
 )
-from .ui_schema import ServerPathDirectory, extract_ui_schema_recursive
+from .ui_schema import BoolSelect, IntSelect, ServerPathDirectory, extract_ui_schema_recursive
 
 
 def str_to_list(v: str | list[Any] | None, sep: Literal[",", "|"] = ",", unique: bool = True) -> list[str]:
@@ -55,6 +55,8 @@ def str_to_list(v: str | list[Any] | None, sep: Literal[",", "|"] = ",", unique:
 
 
 class TranslateConfig(BaseModel):
+    model_config = ConfigDict(title="翻译设置")
+
     translate_by: list[Translator] = Field(
         default_factory=lambda: [Translator.YOUDAO, Translator.GOOGLE, Translator.DEEPL, Translator.LLM],
         title="翻译服务",
@@ -78,11 +80,15 @@ class TranslateConfig(BaseModel):
 
 
 class SiteConfig(BaseModel):
+    model_config = ConfigDict(title="网站设置")
+
     use_browser: bool = Field(default=False, title="使用无头浏览器")
     custom_url: HttpUrl | None = Field(default=None, title="自定义网址")
 
 
 class FieldConfig(BaseModel):
+    model_config = ConfigDict(title="字段设置")
+
     site_prority: list[Website] = Field(default_factory=list, title="来源网站优先级")
     language: Language = Field(default=Language.UNDEFINED, title="语言偏好")
     translate: bool = Field(
@@ -93,7 +99,7 @@ class FieldConfig(BaseModel):
 
 
 class Config(BaseModel):
-    model_config = ConfigDict()
+    model_config = ConfigDict(title="配置")
     # region: General Settings
     media_path: str = ServerPathDirectory("./media", title="媒体路径", initial_path=SAFE_DIRS[0].as_posix())
     softlink_path: str = ServerPathDirectory("softlink", title="软链接路径", ref_field="media_path")
@@ -212,7 +218,12 @@ class Config(BaseModel):
     thread_number: int = Field(default=50, title="并发数")
     thread_time: int = Field(default=0, title="线程时间")
     javdb_time: int = Field(default=10, title="Javdb时间")
-    main_mode: int = Field(default=1, title="主模式")
+    main_mode: int = IntSelect(
+        default=1,
+        title="主模式",
+        description="正常模式适合海报墙用户; 视频模式仅整理视频",
+        options=[(1, "正常模式"), (2, "视频模式")],
+    )
     read_mode: list[ReadMode] = Field(default_factory=list, title="读取模式")
     update_mode: str = Field(default="c", title="更新模式")
     update_a_folder: str = Field(default="actor", title="更新A目录")
@@ -220,7 +231,12 @@ class Config(BaseModel):
     update_c_filetemplate: str = Field(default="number", title="更新C文件模板")
     update_d_folder: str = Field(default="number actor", title="更新D目录")
     update_titletemplate: str = Field(default="number title", title="更新标题模板")
-    soft_link: int = Field(default=0, title="软链接")
+    soft_link: int = IntSelect(
+        default=0,
+        title="链接模式",
+        description="软链接适合网盘用户; 硬链接适合PT用户",
+        options=[(0, "不创建"), (1, "创建软链接"), (2, "创建硬链接")],
+    )
     success_file_move: bool = Field(default=True, title="成功后移动文件")
     failed_file_move: bool = Field(default=True, title="失败后移动文件")
     success_file_rename: bool = Field(default=True, title="成功后重命名文件")
@@ -574,9 +590,9 @@ class Config(BaseModel):
     # endregion
 
     # region: Watermark Settings
-    poster_mark: int = Field(default=1, title="海报水印")
-    thumb_mark: int = Field(default=1, title="缩略图水印")
-    fanart_mark: int = Field(default=0, title="Fanart水印")
+    poster_mark: int = BoolSelect(default=1, title="海报水印", description="是否在海报图片上添加水印", false_label="不添加", true_label="添加")
+    thumb_mark: int = BoolSelect(default=1, title="缩略图水印", description="是否在缩略图上添加水印", false_label="不添加", true_label="添加")
+    fanart_mark: int = BoolSelect(default=0, title="背景图水印", description="是否在背景图上添加水印", false_label="不添加", true_label="添加")
     mark_size: int = Field(default=5, title="水印大小")
     mark_type: list[MarkType] = Field(
         default_factory=lambda: [

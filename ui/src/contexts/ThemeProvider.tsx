@@ -1,11 +1,13 @@
 import { createTheme, ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
 import { createContext, type ReactNode, useEffect, useMemo, useState } from "react";
+import { darkThemeOptions, lightThemeOptions } from "@/styles/theme";
 
-type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark" | "system";
 
 interface ThemeContextType {
   mode: ThemeMode;
   setMode: (mode: ThemeMode) => void;
+  effectiveMode: "light" | "dark";
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -20,53 +22,36 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     return "system";
   });
 
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return "dark";
+  });
+
+  const effectiveMode = mode === "system" ? systemTheme : mode;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const currentTheme = mode === "system" ? systemTheme : mode;
-
-    document.documentElement.classList.toggle("dark", currentTheme === "dark");
+    document.documentElement.classList.toggle("dark", effectiveMode === "dark");
     localStorage.setItem("themeMode", mode);
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => {
-      if (mode === "system") {
-        const newSystemTheme = mediaQuery.matches ? "dark" : "light";
-        document.documentElement.classList.toggle("dark", newSystemTheme === "dark");
-      }
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemTheme(e.matches ? "dark" : "light");
     };
 
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [mode]);
+  }, [mode, effectiveMode]);
 
   const theme = useMemo(() => {
-    if (typeof window === "undefined") {
-      return createTheme({ palette: { mode: "dark" } });
-    }
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const finalMode = mode === "system" ? systemTheme : mode;
-
-    return createTheme({
-      palette: {
-        mode: finalMode,
-        primary: {
-          main: finalMode === "dark" ? "#90caf9" : "#1976d2",
-        },
-        secondary: {
-          main: finalMode === "dark" ? "#f48fb1" : "#dc004e",
-        },
-        background: {
-          default: finalMode === "dark" ? "#020917" : "#fafafa",
-          paper: finalMode === "dark" ? "#1e1e1e" : "#ffffff",
-        },
-      },
-    });
-  }, [mode]);
+    return createTheme(effectiveMode === "dark" ? darkThemeOptions : lightThemeOptions);
+  }, [effectiveMode]);
 
   return (
-    <ThemeContext.Provider value={{ mode, setMode }}>
+    <ThemeContext.Provider value={{ mode, setMode, effectiveMode }}>
       <MuiThemeProvider theme={theme}>{children}</MuiThemeProvider>
     </ThemeContext.Provider>
   );

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from ...config import SAFE_DIRS
+from mdcx.utils.file import open_file_thread
 from .utils import check_path_access
 
 router = APIRouter(prefix="/files", tags=["文件管理"])
@@ -84,3 +85,85 @@ async def list_files(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred: {str(e)}"
         )
+
+
+class OpenPathRequest(BaseModel):
+    """打开路径请求"""
+
+    path: str = Field(description="要打开的文件或文件夹路径")
+    reveal: bool = Field(default=True, description="是否在文件管理器中显示（而不是直接打开文件）")
+
+
+@router.post("/open", operation_id="openPath", summary="打开文件或文件夹")
+async def open_path(body: OpenPathRequest):
+    """
+    在系统文件管理器中打开文件或文件夹。
+
+    - 如果 reveal=True，将在文件管理器中显示并选中该路径
+    - 如果 reveal=False，将直接打开文件（使用系统默认程序）
+    """
+    p = Path(body.path)
+    check_path_access(p, *SAFE_DIRS)
+
+    if not p.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="路径不存在")
+
+    try:
+        open_file_thread(p, is_dir=body.reveal)
+        return {"success": True, "message": f"已打开: {body.path}"}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"打开失败: {str(e)}")
+
+
+class NfoContentResponse(BaseModel):
+    """NFO 文件内容响应"""
+
+    path: str = Field(description="NFO 文件路径")
+    content: str = Field(description="NFO 文件内容（XML）")
+    exists: bool = Field(description="文件是否存在")
+
+
+@router.get("/nfo", operation_id="readNfo", summary="读取 NFO 文件")
+async def read_nfo(path: Annotated[str, Query(description="NFO 文件路径")]) -> NfoContentResponse:
+    """
+    读取 NFO 文件的内容。
+    """
+    p = Path(path)
+    check_path_access(p, *SAFE_DIRS)
+
+    if not p.exists():
+        return NfoContentResponse(path=str(p), content="", exists=False)
+
+    if not p.suffix.lower() == ".nfo":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不是 NFO 文件")
+
+    try:
+        content = p.read_text(encoding="utf-8")
+        return NfoContentResponse(path=str(p), content=content, exists=True)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"读取失败: {str(e)}")
+
+
+class SaveNfoRequest(BaseModel):
+    """保存 NFO 文件请求"""
+
+    path: str = Field(description="NFO 文件路径")
+    content: str = Field(description="NFO 文件内容（XML）")
+
+
+@router.post("/nfo", operation_id="saveNfo", summary="保存 NFO 文件")
+async def save_nfo(body: SaveNfoRequest):
+    """
+    保存 NFO 文件的内容。
+    """
+    p = Path(body.path)
+    check_path_access(p, *SAFE_DIRS)
+
+    if not p.suffix.lower() == ".nfo":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不是 NFO 文件")
+
+    try:
+        p.write_text(body.content, encoding="utf-8")
+        return {"success": True, "message": "NFO 文件已保存", "path": str(p)}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"保存失败: {str(e)}")

@@ -150,3 +150,52 @@ ServerPathFileMultiple = update_wrapper(partial(_ServerPath, path_type="file", m
 ServerPathDirectory = update_wrapper(partial(_ServerPath, path_type="directory", multiple=False), _ServerPath)
 ServerPathDirectoryMultiple = update_wrapper(partial(_ServerPath, path_type="directory", multiple=True), _ServerPath)
 ServerPathMixedField = update_wrapper(partial(_ServerPath, path_type="mixed", multiple=True), _ServerPath)
+
+
+def IntSelect(
+    default: int,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    options: list[tuple[int, str]],
+) -> int:
+    """
+    创建一个整数字段，在 UI 中显示为下拉框。
+
+    Args:
+        default: 默认值
+        title: 字段标题
+        description: 字段描述
+        options: 选项列表，每个选项是 (值, 显示名称) 的元组
+
+    Returns:
+        配置了下拉框 UI 的 Field
+    """
+    # 使用 oneOf 来定义选项，这样 rjsf 会自动渲染为下拉框
+    one_of = [{"const": value, "title": label} for value, label in options]
+    json_schema_extra: dict[str, Any] = {"oneOf": one_of}
+    return Field(default=default, title=title, description=description, json_schema_extra=json_schema_extra)  # type: ignore
+
+
+def BoolSelect(
+    default: int,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    false_label: str = "否",
+    true_label: str = "是",
+) -> int:
+    """
+    创建一个 0/1 整数字段，在 UI 中显示为下拉框（类似布尔值）。
+
+    Args:
+        default: 默认值 (0 或 1)
+        title: 字段标题
+        description: 字段描述
+        false_label: 值为 0 时的显示名称
+        true_label: 值为 1 时的显示名称
+
+    Returns:
+        配置了下拉框 UI 的 Field
+    """
+    return IntSelect(default, title=title, description=description, options=[(0, false_label), (1, true_label)])
