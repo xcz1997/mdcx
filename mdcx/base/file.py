@@ -656,3 +656,69 @@ async def move_trailer_video(old_dir: Path, new_dir: Path, file_name: str, namin
         if await aiofiles.os.path.exists(trailer_old_path) and not await aiofiles.os.path.exists(trailer_new_path):
             await move_file_async(trailer_old_path, trailer_new_path)
             LogBuffer.log().write("\n 🍀 Trailer done!")
+
+
+async def move_videos_to_folder(exclude_dirs: list[str] | None = None):
+    """
+    将待刮削目录中的视频和字幕文件移动到 Movie_moved 文件夹。
+    这是从 main_window.py 中抽取出来的独立异步函数。
+
+    Args:
+        exclude_dirs: 排除的目录路径列表（相对路径或绝对路径）
+    """
+    signal.change_buttons_status()
+
+    c = get_movie_path_setting()
+    movie_path = c.movie_path
+    ignore_dirs = c.ignore_dirs
+    ignore_dirs.append(movie_path / "Movie_moved")
+
+    # 添加用户指定的排除目录
+    if exclude_dirs:
+        for dir_path in exclude_dirs:
+            if dir_path:
+                exclude_path = Path(dir_path)
+                # 如果是相对路径，则相对于 movie_path
+                if not exclude_path.is_absolute():
+                    exclude_path = movie_path / exclude_path
+                ignore_dirs.append(exclude_path)
+                signal.show_log_text(f" 📁 Exclude directory: {exclude_path}")
+
+    movie_list = await movie_lists(ignore_dirs, manager.config.media_type + manager.config.sub_type, movie_path)
+
+    if not movie_list:
+        signal.show_log_text("No movie found!")
+        signal.show_log_text("=" * 80)
+        signal.reset_buttons_status()
+        return
+
+    des_path = movie_path / "Movie_moved"
+    if not des_path.exists():
+        signal.show_log_text("Created folder: Movie_moved")
+        os.makedirs(des_path)
+
+    signal.show_log_text("Start move movies...")
+    skip_list = []
+
+    for file_path in movie_list:
+        file_name = file_path.name
+        file_ext = file_path.suffix.lower()
+        try:
+            shutil.move(file_path, des_path)
+            if file_ext in manager.config.media_type:
+                signal.show_log_text("   Move movie: " + file_name + " to Movie_moved Success!")
+            else:
+                signal.show_log_text("   Move sub: " + file_name + " to Movie_moved Success!")
+        except Exception as e:
+            skip_list.append([file_name, file_path, str(e)])
+
+    if skip_list:
+        signal.show_log_text(f"\n{len(skip_list)} file(s) did not move!")
+        i = 0
+        for info in skip_list:
+            i += 1
+            signal.show_log_text(f"[{i}] {info[0]}\n file path: {info[1]}\n {info[2]}\n")
+
+    signal.show_log_text("Move movies finished!")
+    signal.show_log_text("=" * 80)
+    signal.reset_buttons_status()

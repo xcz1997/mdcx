@@ -5,6 +5,7 @@ from .config import router as config_router
 from .files import router as files_router
 from .images import router as images_router
 from .legacy import router as legacy_router
+from .media import router as media_router
 from .network import router as network_router
 from .scrape import router as scrape_router
 from .tools import router as tools_router
@@ -19,3 +20,4 @@ api.include_router(scrape_router)
 api.include_router(network_router)
 api.include_router(images_router)
 api.include_router(tools_router)
+api.include_router(media_router)

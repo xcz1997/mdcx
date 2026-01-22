@@ -14,7 +14,9 @@ import {
   Paper,
   Typography,
 } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { client } from "@/client/client.gen";
 
 export const Route = createFileRoute("/about")({
   component: About,
@@ -52,6 +54,22 @@ const features = [
 ];
 
 function About() {
+  // 获取版本信息
+  interface VersionInfo {
+    version: string;
+    version_code: number;
+  }
+
+  const versionQuery = useQuery({
+    queryKey: ["version"],
+    queryFn: async () => {
+      const response = await client.instance.get<VersionInfo>("/api/v1/config/version");
+      return response.data;
+    },
+  });
+
+  const version = versionQuery.data?.version ?? "v2.0.0";
+
   return (
     <Box sx={{ p: 2 }}>
       {/* 标题区域 */}
@@ -80,7 +98,7 @@ function About() {
         </Box>
 
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Chip label="v2.0.0" sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }} />
+          <Chip label={version} sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }} />
           <Chip label="网页版" sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }} />
           <Chip label="开源" sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }} />
         </Box>

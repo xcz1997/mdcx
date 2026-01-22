@@ -9,6 +9,7 @@ import {
   Movie as MovieIcon,
   Person as PersonIcon,
   AccessTime as RuntimeIcon,
+  Star as StarIcon,
   Theaters as StudioIcon,
 } from "@mui/icons-material";
 import { Box, Chip, Divider, Grid, Link, Paper, Skeleton, styled, Typography } from "@mui/material";
@@ -214,6 +215,17 @@ export function MediaInfoCard({
                 <MovieIcon />
                 <InfoLabel variant="body2">系列</InfoLabel>
                 <InfoValue variant="body2">{media.series}</InfoValue>
+              </InfoRow>
+            )}
+
+            {/* 评分 */}
+            {media.score !== undefined && media.score > 0 && (
+              <InfoRow>
+                <StarIcon sx={{ color: "warning.main" }} />
+                <InfoLabel variant="body2">评分</InfoLabel>
+                <InfoValue variant="body2" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {media.score.toFixed(1)}
+                </InfoValue>
               </InfoRow>
             )}
           </Box>

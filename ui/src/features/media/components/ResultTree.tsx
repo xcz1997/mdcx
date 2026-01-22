@@ -5,10 +5,12 @@
 
 import {
   Delete as DeleteIcon,
+  Edit as EditIcon,
   Error as ErrorIcon,
   ExpandLess,
   ExpandMore,
   Folder as FolderIcon,
+  Link as LinkIcon,
   MoreVert as MoreIcon,
   PlayArrow as PlayIcon,
   Refresh as RefreshIcon,
@@ -37,6 +39,8 @@ interface ResultTreeProps {
   selectedId: string | null;
   onSelect: (item: ScrapeResultItem) => void;
   onRescrape?: (item: ScrapeResultItem) => void;
+  onScrapeWithUrl?: (item: ScrapeResultItem) => void;
+  onEditNfo?: (item: ScrapeResultItem) => void;
   onOpenFolder?: (item: ScrapeResultItem) => void;
   onPlay?: (item: ScrapeResultItem) => void;
   onDelete?: (item: ScrapeResultItem) => void;
@@ -69,6 +73,8 @@ export function ResultTree({
   selectedId,
   onSelect,
   onRescrape,
+  onScrapeWithUrl,
+  onEditNfo,
   onOpenFolder,
   onPlay,
   onDelete,
@@ -94,11 +100,17 @@ export function ResultTree({
     setContextMenu(null);
   };
 
-  const handleMenuAction = (action: "rescrape" | "openFolder" | "play" | "delete") => {
+  const handleMenuAction = (action: "rescrape" | "scrapeWithUrl" | "editNfo" | "openFolder" | "play" | "delete") => {
     if (contextMenu) {
       switch (action) {
         case "rescrape":
           onRescrape?.(contextMenu.item);
+          break;
+        case "scrapeWithUrl":
+          onScrapeWithUrl?.(contextMenu.item);
+          break;
+        case "editNfo":
+          onEditNfo?.(contextMenu.item);
           break;
         case "openFolder":
           onOpenFolder?.(contextMenu.item);
@@ -245,6 +257,18 @@ export function ResultTree({
             <RefreshIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>重新刮削</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleMenuAction("scrapeWithUrl")}>
+          <ListItemIcon>
+            <LinkIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>输入网址刮削</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleMenuAction("editNfo")}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>编辑 NFO</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => handleMenuAction("openFolder")}>
           <ListItemIcon>

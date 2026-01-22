@@ -1,4 +1,4 @@
-import { Box, Grid } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Grid, TextField } from "@mui/material";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/contexts/ToastProvider";
@@ -8,6 +8,7 @@ import { ResultTree } from "@/features/media/components/ResultTree";
 import { ScrapeControl } from "@/features/scraping/components/ScrapeControl";
 import { FolderSelectDialog } from "@/features/tools/components/FolderSelectDialog";
 import { ImageCropDialog } from "@/features/tools/components/ImageCropDialog";
+import type { ScrapeResultItem } from "@/store/scrapeStore";
 import { useScrapeStore } from "@/store/scrapeStore";
 
 export const Route = createFileRoute("/")({
@@ -26,6 +27,11 @@ function HomePage() {
   // 文件夹选择对话框状态
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [currentMediaPath, setCurrentMediaPath] = useState("");
+
+  // URL 输入对话框状态
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [urlScrapeItem, setUrlScrapeItem] = useState<ScrapeResultItem | null>(null);
 
   const {
     status,
@@ -231,6 +237,44 @@ function HomePage() {
     }
   }, [setStatus, showToast]);
 
+  // 暂停刮削
+  const handlePause = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/scrape/pause", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": localStorage.getItem("apiKey") || "",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("暂停刮削失败");
+      }
+      setStatus("paused");
+      showToast("刮削已暂停", "info");
+    } catch (error) {
+      showToast((error as Error).message || "暂停刮削失败", "error");
+    }
+  }, [setStatus, showToast]);
+
+  // 恢复刮削
+  const handleResume = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/scrape/resume", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": localStorage.getItem("apiKey") || "",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("恢复刮削失败");
+      }
+      setStatus("scraping");
+      showToast("刮削已恢复", "success");
+    } catch (error) {
+      showToast((error as Error).message || "恢复刮削失败", "error");
+    }
+  }, [setStatus, showToast]);
+
   // 清空结果
   const handleClear = useCallback(() => {
     clearResults();
@@ -240,10 +284,179 @@ function HomePage() {
 
   // 选择结果项
   const handleSelectItem = useCallback(
-    (item: (typeof successList)[0]) => {
+    (item: ScrapeResultItem) => {
       setSelectedItem(item);
     },
     [setSelectedItem],
+  );
+
+  // 输入网址刮削
+  const handleScrapeWithUrl = useCallback((item: ScrapeResultItem) => {
+    setUrlScrapeItem(item);
+    setScrapeUrl("");
+    setUrlDialogOpen(true);
+  }, []);
+
+  // 确认使用 URL 刮削
+  const handleConfirmUrlScrape = useCallback(async () => {
+    if (!urlScrapeItem || !scrapeUrl.trim()) {
+      showToast("请输入有效的网址", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/v1/tools/scrape-single", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": localStorage.getItem("apiKey") || "",
+        },
+        body: JSON.stringify({
+          path: urlScrapeItem.path,
+          url: scrapeUrl.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "刮削失败");
+      }
+
+      showToast("已开始使用指定网址刮削", "success");
+      setUrlDialogOpen(false);
+    } catch (error) {
+      showToast((error as Error).message || "刮削失败", "error");
+    }
+  }, [urlScrapeItem, scrapeUrl, showToast]);
+
+  // 编辑 NFO
+  const handleEditNfo = useCallback(
+    async (item: ScrapeResultItem) => {
+      try {
+        // 通过打开文件夹的方式让用户编辑 NFO
+        const response = await fetch("/api/v1/tools/open-folder", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": localStorage.getItem("apiKey") || "",
+          },
+          body: JSON.stringify({ path: item.path }),
+        });
+
+        if (!response.ok) {
+          throw new Error("打开文件夹失败");
+        }
+
+        showToast("已打开文件夹，请手动编辑 NFO 文件", "info");
+      } catch (error) {
+        showToast((error as Error).message || "打开文件夹失败", "error");
+      }
+    },
+    [showToast],
+  );
+
+  // 重新刮削
+  const handleRescrapeItem = useCallback(
+    async (item: ScrapeResultItem) => {
+      try {
+        const response = await fetch("/api/v1/tools/scrape-single", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": localStorage.getItem("apiKey") || "",
+          },
+          body: JSON.stringify({
+            path: item.path,
+            url: "",
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || "刮削失败");
+        }
+
+        showToast("已开始重新刮削", "success");
+      } catch (error) {
+        showToast((error as Error).message || "重新刮削失败", "error");
+      }
+    },
+    [showToast],
+  );
+
+  // 打开文件夹
+  const handleOpenFolder = useCallback(
+    async (item: ScrapeResultItem) => {
+      try {
+        const response = await fetch("/api/v1/tools/open-folder", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": localStorage.getItem("apiKey") || "",
+          },
+          body: JSON.stringify({ path: item.path }),
+        });
+
+        if (!response.ok) {
+          throw new Error("打开文件夹失败");
+        }
+      } catch (error) {
+        showToast((error as Error).message || "打开文件夹失败", "error");
+      }
+    },
+    [showToast],
+  );
+
+  // 播放视频
+  const handlePlayVideo = useCallback(
+    async (item: ScrapeResultItem) => {
+      try {
+        const response = await fetch("/api/v1/tools/play-video", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": localStorage.getItem("apiKey") || "",
+          },
+          body: JSON.stringify({ path: item.path }),
+        });
+
+        if (!response.ok) {
+          throw new Error("播放视频失败");
+        }
+      } catch (error) {
+        showToast((error as Error).message || "播放视频失败", "error");
+      }
+    },
+    [showToast],
+  );
+
+  // 删除文件
+  const handleDeleteItem = useCallback(
+    async (item: ScrapeResultItem) => {
+      if (!window.confirm(`确定要删除 ${item.path} 吗？此操作不可撤销。`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/v1/tools/delete-file", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": localStorage.getItem("apiKey") || "",
+          },
+          body: JSON.stringify({ path: item.path }),
+        });
+
+        if (!response.ok) {
+          throw new Error("删除失败");
+        }
+
+        showToast("文件已删除", "success");
+      } catch (error) {
+        showToast((error as Error).message || "删除失败", "error");
+      }
+    },
+    [showToast],
   );
 
   // 演员点击
@@ -322,8 +535,11 @@ function HomePage() {
         failed={failed}
         progress={progress}
         scrapeInfo={scrapeInfo}
+        mediaPath={currentMediaPath}
         onStart={handleStart}
         onStop={handleStop}
+        onPause={handlePause}
+        onResume={handleResume}
         onClear={handleClear}
         onSelectFolder={handleSelectFolder}
       />
@@ -336,6 +552,12 @@ function HomePage() {
             failedItems={failedList}
             selectedId={selectedItem?.id || null}
             onSelect={handleSelectItem}
+            onRescrape={handleRescrapeItem}
+            onScrapeWithUrl={handleScrapeWithUrl}
+            onEditNfo={handleEditNfo}
+            onOpenFolder={handleOpenFolder}
+            onPlay={handlePlayVideo}
+            onDelete={handleDeleteItem}
           />
         </Grid>
 
@@ -367,6 +589,30 @@ function HomePage() {
         title="选择媒体文件夹"
         initialPath={currentMediaPath}
       />
+
+      {/* URL 输入对话框 */}
+      <Dialog open={urlDialogOpen} onClose={() => setUrlDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>输入网址刮削</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="刮削网址"
+            placeholder="输入 JavDB、JavBus 等网站的详情页网址"
+            fullWidth
+            variant="outlined"
+            value={scrapeUrl}
+            onChange={(e) => setScrapeUrl(e.target.value)}
+            helperText={urlScrapeItem ? `文件: ${urlScrapeItem.path}` : ""}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUrlDialogOpen(false)}>取消</Button>
+          <Button onClick={handleConfirmUrlScrape} variant="contained" disabled={!scrapeUrl.trim()}>
+            开始刮削
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

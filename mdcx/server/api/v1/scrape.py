@@ -27,6 +27,7 @@ class ScrapeStatus(str, Enum):
 
     IDLE = "idle"
     SCRAPING = "scraping"
+    PAUSED = "paused"
     STOPPING = "stopping"
 
 
@@ -85,6 +86,9 @@ def _get_current_status() -> ScrapeStatus:
 
     # 检查是否有活跃的刮削任务
     if Flags.total_count > 0 and Flags.scrape_done < Flags.total_count:
+        # 检查是否暂停
+        if Flags.is_paused:
+            return ScrapeStatus.PAUSED
         return ScrapeStatus.SCRAPING
 
     return ScrapeStatus.IDLE
@@ -156,10 +160,59 @@ async def stop_scrape():
         # 设置停止标志
         Flags.stop_other = True
         Flags.rest_time_convert = 0
+        # 如果当前是暂停状态，先恢复以便停止
+        if Flags.is_paused:
+            Flags.is_paused = False
+            Flags.pause_event.set()
 
         return {"message": "刮削停止请求已发送", "status": ScrapeStatus.STOPPING}
     except Exception as e:
         _is_stopping = False
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/pause", summary="暂停刮削", operation_id="pauseScrape")
+async def pause_scrape():
+    """
+    暂停当前刮削任务
+
+    暂停后，正在进行的任务会在下一个检查点停下来等待恢复。
+    """
+    current_status = _get_current_status()
+    if current_status == ScrapeStatus.IDLE:
+        return {"message": "没有正在进行的刮削任务", "status": ScrapeStatus.IDLE}
+
+    if current_status == ScrapeStatus.PAUSED:
+        return {"message": "刮削任务已暂停", "status": ScrapeStatus.PAUSED}
+
+    if current_status == ScrapeStatus.STOPPING:
+        return {"message": "刮削任务正在停止中，无法暂停", "status": ScrapeStatus.STOPPING}
+
+    try:
+        Flags.is_paused = True
+        Flags.pause_event.clear()  # 清除恢复事件，阻塞等待
+        return {"message": "刮削已暂停", "status": ScrapeStatus.PAUSED}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/resume", summary="恢复刮削", operation_id="resumeScrape")
+async def resume_scrape():
+    """
+    恢复暂停的刮削任务
+    """
+    current_status = _get_current_status()
+    if current_status == ScrapeStatus.IDLE:
+        return {"message": "没有正在进行的刮削任务", "status": ScrapeStatus.IDLE}
+
+    if current_status != ScrapeStatus.PAUSED:
+        return {"message": "刮削任务未处于暂停状态", "status": current_status}
+
+    try:
+        Flags.is_paused = False
+        Flags.pause_event.set()  # 设置恢复事件，唤醒等待的协程
+        return {"message": "刮削已恢复", "status": ScrapeStatus.SCRAPING}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

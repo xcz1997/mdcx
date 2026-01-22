@@ -11,6 +11,15 @@ import { routeTree } from "./routeTree.gen";
 import { type LogEntry, useLogStore } from "./store/logStore";
 
 const router = createRouter({ routeTree });
+
+// 应用启动时从 localStorage 恢复 API Key
+const savedApiKey = localStorage.getItem("apiKey");
+if (savedApiKey) {
+  client.setConfig({
+    baseURL: import.meta.env.PROD ? "" : import.meta.env.PUBLIC_DEV_API_URL,
+    auth: savedApiKey,
+  });
+}
 declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router;

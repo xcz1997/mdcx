@@ -27,25 +27,15 @@ function shouldBeFullWidth(
     return true;
   }
 
-  // 特定的长字段名占整行
+  // 特定的长字段名占整行（路径类字段）
   const fullWidthFields = [
     "media_path",
     "success_output_folder",
     "failed_output_folder",
-    "naming_file",
-    "naming_media",
-    "folder_name",
-    "fields_rule",
-    "site_config",
-    "all_sites",
-    "translate_config",
-    "field_config",
-    "nfo_fields",
     "extrafanart_folder",
     "extrafanart_copy_folder",
     "actor_photo_folder",
     "actor_photo_net_path",
-    "prevent_char",
   ];
 
   if (fullWidthFields.includes(name)) {
@@ -73,22 +63,14 @@ export function GridObjectFieldTemplate(props: ObjectFieldTemplateProps) {
   return (
     <div>
       {title && <h3 style={{ marginBottom: 16 }}>{title}</h3>}
-      {description && (
-        <p style={{ marginBottom: 16, color: "rgba(0,0,0,0.6)" }}>
-          {description}
-        </p>
-      )}
+      {description && <p style={{ marginBottom: 16, color: "rgba(0,0,0,0.6)" }}>{description}</p>}
       <Grid container spacing={2}>
         {properties.map((prop) => {
           const fieldUiSchema = uiSchema?.[prop.name] as
             | { "ui:widget"?: string; "ui:options"?: { rows?: number } }
             | undefined;
           const fieldSchema = getFieldSchema(prop.content);
-          const isFullWidth = shouldBeFullWidth(
-            prop.name,
-            fieldSchema,
-            fieldUiSchema,
-          );
+          const isFullWidth = shouldBeFullWidth(prop.name, fieldSchema, fieldUiSchema);
 
           return (
             <Grid

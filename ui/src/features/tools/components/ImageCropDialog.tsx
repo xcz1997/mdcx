@@ -380,7 +380,11 @@ export function ImageCropDialog({ open, onClose, imagePath, imageType, onSave }:
             <Box sx={{ position: "relative", maxWidth: "100%", maxHeight: "100%" }}>
               <img
                 ref={imageRef}
-                src={`/api/v1/images/preview?path=${encodeURIComponent(imagePath)}`}
+                src={
+                  imagePath.startsWith("blob:") || imagePath.startsWith("http")
+                    ? imagePath
+                    : `/api/v1/images/preview?path=${encodeURIComponent(imagePath)}`
+                }
                 alt="裁剪预览"
                 onLoad={handleImageLoad}
                 style={{
@@ -449,13 +453,33 @@ export function ImageCropDialog({ open, onClose, imagePath, imageType, onSave }:
 
           {/* 控制面板 */}
           <Stack direction={isMobile ? "column" : "row"} spacing={2} alignItems="flex-start">
-            {/* 尺寸信息 */}
-            <Box sx={{ minWidth: 120 }}>
+            {/* 原始尺寸 */}
+            <Box sx={{ minWidth: 100 }}>
+              <Typography variant="caption" color="text.secondary">
+                原始尺寸
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                {imageSize.width} x {imageSize.height}
+              </Typography>
+            </Box>
+
+            {/* 裁剪尺寸 */}
+            <Box sx={{ minWidth: 100 }}>
               <Typography variant="caption" color="text.secondary">
                 裁剪尺寸
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
                 {displaySize.width} x {displaySize.height}
+              </Typography>
+            </Box>
+
+            {/* 裁剪位置 */}
+            <Box sx={{ minWidth: 120 }}>
+              <Typography variant="caption" color="text.secondary">
+                裁剪位置
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                ({Math.round(cropBox.x)}, {Math.round(cropBox.y)})
               </Typography>
             </Box>
 

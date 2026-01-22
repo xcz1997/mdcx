@@ -89,7 +89,7 @@ const createMenuItems = <
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { mode, setMode } = useTheme();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const handleThemeChange = () => {
     const newMode = mode === "light" ? "dark" : mode === "dark" ? "system" : "light";

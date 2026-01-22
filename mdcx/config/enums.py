@@ -244,13 +244,18 @@ class Translator(Enum):
 
 class ReadMode(Enum):
     HAS_NFO_UPDATE = "has_nfo_update"
-    NO_NFO_SCRAPE = "no_nfo_scrape"
-    READ_DOWNLOAD_AGAIN = "read_download_again"
     READ_UPDATE_NFO = "read_update_nfo"
+    READ_DOWNLOAD_AGAIN = "read_download_again"
+    NO_NFO_SCRAPE = "no_nfo_scrape"
 
     @classmethod
     def names(cls):
-        return ["有NFO时更新", "无NFO时刮削", "重新下载", "更新NFO"]
+        return [
+            "本地已刮削成功的文件，重新整理分类（按更新模式规则）",
+            "允许更新 nfo 文件",
+            "重新下载图片等文件（nfo 需有链接）",
+            "本地之前刮削失败的文件和没有nfo的文件，重新刮削（按更新模式规则）",
+        ]
 
 
 class DownloadableFile(Enum):

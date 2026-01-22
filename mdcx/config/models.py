@@ -101,11 +101,11 @@ class FieldConfig(BaseModel):
 class Config(BaseModel):
     model_config = ConfigDict(title="配置")
     # region: General Settings
-    media_path: str = ServerPathDirectory("./media", title="媒体路径", initial_path=SAFE_DIRS[0].as_posix())
-    softlink_path: str = ServerPathDirectory("softlink", title="软链接路径", ref_field="media_path")
-    success_output_folder: str = ServerPathDirectory("JAV_output", title="成功输出目录", ref_field="media_path")
-    failed_output_folder: str = ServerPathDirectory("failed", title="失败输出目录", ref_field="media_path")
-    extrafanart_folder: str = ServerPathDirectory("extrafanart_copy", title="额外剧照目录")
+    media_path: str = ServerPathDirectory("./media", title="媒体路径", initial_path=SAFE_DIRS[0].as_posix(), description="待刮削视频文件所在的目录路径")
+    softlink_path: str = ServerPathDirectory("softlink", title="软链接路径", ref_field="media_path", description="创建软链接时的目标目录")
+    success_output_folder: str = ServerPathDirectory("JAV_output", title="成功输出目录", ref_field="media_path", description="刮削成功的文件输出目录")
+    failed_output_folder: str = ServerPathDirectory("failed", title="失败输出目录", ref_field="media_path", description="刮削失败的文件输出目录")
+    extrafanart_folder: str = ServerPathDirectory("extrafanart_copy", title="额外剧照目录", description="存放额外剧照副本的目录")
     media_type: list[str] = Field(
         default_factory=lambda: [
             ".mp4",
@@ -143,8 +143,8 @@ class Config(BaseModel):
         ],
         title="字幕类型",
     )
-    scrape_softlink_path: bool = Field(default=False, title="刮削软链接路径")
-    auto_link: bool = Field(default=False, title="自动创建软链接")
+    scrape_softlink_path: bool = Field(default=False, title="刮削软链接路径", description="是否同时刮削软链接目录中的文件")
+    auto_link: bool = Field(default=False, title="自动创建软链接", description="刮削成功后自动创建软链接到指定目录")
     # endregion
 
     # region: Cleaning Settings
@@ -166,7 +166,7 @@ class Config(BaseModel):
         ],
         title="要从文件名中删除的字符串",
     )
-    file_size: float = Field(default=100.0, title="要处理的最小文件大小（MB）")
+    file_size: float = Field(default=100.0, title="要处理的最小文件大小（MB）", description="小于此大小的文件将被忽略不参与刮削")
     no_escape: list[NoEscape] = Field(
         default_factory=lambda: [NoEscape.RECORD_SUCCESS_FILE],
         title="不转义的字符串",
@@ -215,16 +215,17 @@ class Config(BaseModel):
     # endregion
 
     # region: Scraping Settings
-    thread_number: int = Field(default=50, title="并发数")
-    thread_time: int = Field(default=0, title="线程时间")
-    javdb_time: int = Field(default=10, title="Javdb时间")
+    thread_number: int = Field(default=50, title="并发数", description="同时刮削的最大并发任务数")
+    thread_time: int = Field(default=0, title="线程时间", description="每个线程执行间隔(秒), 0表示无间隔")
+    javdb_time: int = Field(default=10, title="Javdb时间", description="访问JavDB时的请求间隔(秒)")
     main_mode: int = IntSelect(
         default=1,
-        title="主模式",
-        description="正常模式适合海报墙用户; 视频模式仅整理视频",
-        options=[(1, "正常模式"), (2, "视频模式")],
+        title="刮削模式",
+        description="选择刮削的主要模式",
+        options=[(1, "正常模式"), (2, "更新模式"), (3, "读取模式"), (4, "视频模式")],
     )
-    read_mode: list[ReadMode] = Field(default_factory=list, title="读取模式")
+    read_mode: list[ReadMode] = Field(default_factory=list, title="读取模式选项")
+    sort_mode_del_pic: bool = Field(default=False, title="视频模式删除图片", description="视频模式下删除本地已下载的图片和 nfo 文件")
     update_mode: str = Field(default="c", title="更新模式")
     update_a_folder: str = Field(default="actor", title="更新A目录")
     update_b_folder: str = Field(default="number actor", title="更新B目录")
@@ -237,11 +238,11 @@ class Config(BaseModel):
         description="软链接适合网盘用户; 硬链接适合PT用户",
         options=[(0, "不创建"), (1, "创建软链接"), (2, "创建硬链接")],
     )
-    success_file_move: bool = Field(default=True, title="成功后移动文件")
-    failed_file_move: bool = Field(default=True, title="失败后移动文件")
-    success_file_rename: bool = Field(default=True, title="成功后重命名文件")
-    del_empty_folder: bool = Field(default=True, title="删除空目录")
-    show_poster: bool = Field(default=True, title="显示海报")
+    success_file_move: bool = Field(default=True, title="成功后移动文件", description="刮削成功后将文件移动到成功输出目录")
+    failed_file_move: bool = Field(default=True, title="失败后移动文件", description="刮削失败后将文件移动到失败输出目录")
+    success_file_rename: bool = Field(default=True, title="成功后重命名文件", description="刮削成功后按照命名规则重命名文件")
+    del_empty_folder: bool = Field(default=True, title="删除空目录", description="移动文件后删除留下的空目录")
+    show_poster: bool = Field(default=True, title="显示海报", description="刮削时在界面上显示海报图片预览")
     download_files: list[DownloadableFile] = Field(
         default_factory=lambda: [
             DownloadableFile.POSTER,
@@ -562,10 +563,10 @@ class Config(BaseModel):
     # endregion
 
     # region: Server Settings
-    server_type: Literal["emby", "jellyfin"] = Field(default="emby", title="服务器类型")
-    emby_url: HttpUrl = Field(default=HttpUrl("http://127.0.0.1:8096"), title="Emby网址")
-    api_key: str = Field(default="", title="API密钥")
-    user_id: str = Field(default="", title="用户ID")
+    server_type: Literal["emby", "jellyfin"] = Field(default="emby", title="服务器类型", description="媒体服务器类型: emby 或 jellyfin")
+    emby_url: HttpUrl = Field(default=HttpUrl("http://127.0.0.1:8096"), title="Emby网址", description="Emby/Jellyfin 服务器地址")
+    api_key: str = Field(default="", title="API密钥", description="Emby/Jellyfin API 密钥, 用于访问服务器接口")
+    user_id: str = Field(default="", title="用户ID", description="Emby/Jellyfin 用户 ID")
     emby_on: list[EmbyAction] = Field(
         default_factory=lambda: [
             EmbyAction.ACTOR_INFO_ZH_CN,
@@ -618,10 +619,10 @@ class Config(BaseModel):
     # endregion
 
     # region: Network Settings
-    use_proxy: bool = Field(default=False, title="代理类型")
-    proxy: str = Field(default="http://127.0.0.1:7890", title="代理地址")
-    timeout: int = Field(default=10, title="超时")
-    retry: int = Field(default=3, title="重试")
+    use_proxy: bool = Field(default=False, title="使用代理", description="是否使用代理服务器访问网站")
+    proxy: str = Field(default="http://127.0.0.1:7890", title="代理地址", description="代理服务器地址, 支持 http/https/socks5 协议")
+    timeout: int = Field(default=10, title="超时", description="网络请求超时时间(秒)")
+    retry: int = Field(default=3, title="重试", description="网络请求失败后的最大重试次数")
     theporndb_api_token: str = Field(default="", title="Theporndb API令牌")
     javdb: str = Field(default="", title="Javdb")
     javbus: str = Field(default="", title="Javbus")

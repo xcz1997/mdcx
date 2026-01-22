@@ -24,6 +24,10 @@ class _Flags:
     appoint_url: str = ""
     website_name: str = ""
 
+    # 暂停相关
+    is_paused: bool = False  # 暂停标志
+    pause_event: Event = field(default_factory=Event)  # 恢复事件
+
     # 刮削相关
     rest_time_convert: int = 0
     rest_time_convert_: int = 0
@@ -91,6 +95,8 @@ class _Flags:
         self.total_count = 0
         self.rest_now_begin_count = 0
         self.sleep_end.set()  # 初始状态为未休眠
+        self.is_paused = False  # 重置暂停状态
+        self.pause_event.set()  # 初始状态为未暂停
         self.scrape_starting = 0
         self.scrape_started = 0
         self.scrape_done = 0

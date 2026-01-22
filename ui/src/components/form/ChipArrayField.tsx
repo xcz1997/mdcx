@@ -107,7 +107,14 @@ const ChipArrayField = ({ schema, uiSchema, onChange, formData, rawErrors, idSch
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && !event.nativeEvent.isComposing && inputValue) {
       event.preventDefault();
-      if (!data.includes(inputValue)) {
+      // 枚举类型只允许选择预定义选项，不允许手动输入
+      if (enumOptions) {
+        const matchedOption = unused?.find((opt) => opt === inputValue || getEnumName(opt) === inputValue);
+        if (matchedOption && !data.includes(matchedOption)) {
+          setData([...data, matchedOption]);
+          setInputValue("");
+        }
+      } else if (!data.includes(inputValue)) {
         setData([...data, inputValue]);
         setInputValue("");
       }
@@ -185,7 +192,7 @@ const ChipArrayField = ({ schema, uiSchema, onChange, formData, rawErrors, idSch
                           <TextField
                             {...params}
                             autoFocus
-                            placeholder="选择或输入值"
+                            placeholder="搜索选项"
                             onKeyDown={handleKeyDown}
                             value={inputValue}
                           />

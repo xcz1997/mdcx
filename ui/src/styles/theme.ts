@@ -54,8 +54,8 @@ export const lightBackground = {
 
 // 暗色主题背景 - 现代深色
 export const darkBackground = {
-  default: "#0a0a0a",  // 更深的背景
-  paper: "#141414",    // 卡片背景
+  default: "#0a0a0a", // 更深的背景
+  paper: "#141414", // 卡片背景
 };
 
 // 间距系统 (8px 基准) - MD2 标准
@@ -64,10 +64,10 @@ export const spacing = 8;
 // 现代圆角系统
 export const borderRadius = {
   xs: 4,
-  sm: 10,   // 输入框、按钮
-  md: 14,   // 中等组件
-  lg: 16,   // 卡片
-  xl: 20,   // 对话框
+  sm: 10, // 输入框、按钮
+  md: 14, // 中等组件
+  lg: 16, // 卡片
+  xl: 20, // 对话框
   round: 9999,
 };
 
@@ -106,9 +106,9 @@ export const typography = {
     "BlinkMacSystemFont",
     '"Segoe UI"',
     "Roboto",
-    '"PingFang SC"',      // macOS 中文
+    '"PingFang SC"', // macOS 中文
     '"Hiragino Sans GB"', // macOS 中文备选
-    '"Microsoft YaHei"',  // Windows 中文
+    '"Microsoft YaHei"', // Windows 中文
     '"Helvetica Neue"',
     "Arial",
     "sans-serif",

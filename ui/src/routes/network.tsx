@@ -1,9 +1,12 @@
 import {
   CheckCircle,
+  Cookie as CookieIcon,
   Error as ErrorIcon,
   HourglassEmpty,
   NetworkCheck,
   Refresh,
+  Replay as RetryIcon,
+  AccessTime as TimeoutIcon,
   VpnKey,
   Wifi,
   WifiOff,
@@ -38,6 +41,8 @@ import { useTheme } from "@mui/material/styles";
 import { createFileRoute } from "@tanstack/react-router";
 import axios from "axios";
 import { useCallback, useState } from "react";
+import { PullToRefreshIndicator } from "@/components/ui/PullToRefreshIndicator";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 export const Route = createFileRoute("/network")({
   component: NetworkComponent,
@@ -62,10 +67,22 @@ interface ProxyStatus {
   status: SiteStatus;
 }
 
+interface CookieStatus {
+  site: string;
+  configured: boolean;
+}
+
+interface NetworkConfigStatus {
+  timeout: number;
+  retry: number;
+  cookies: CookieStatus[];
+}
+
 interface NetworkCheckResponse {
   proxy: ProxyStatus;
   sites: SiteCheckResult[];
   elapsed: number;
+  config?: NetworkConfigStatus;
 }
 
 // 网站显示名称映射
@@ -188,6 +205,12 @@ function NetworkComponent() {
     }
   }, []);
 
+  // 移动端下拉刷新
+  const { pullDistance, status: pullStatus } = usePullToRefresh({
+    enabled: isMobile,
+    onRefresh: handleCheck,
+  });
+
   // 统计信息
   const stats = result
     ? {
@@ -199,6 +222,9 @@ function NetworkComponent() {
 
   return (
     <Box sx={{ p: 2 }}>
+      {/* 移动端下拉刷新指示器 */}
+      {isMobile && <PullToRefreshIndicator pullDistance={pullDistance} status={pullStatus} />}
+
       {/* 标题和检测按钮 */}
       <Box
         sx={{
@@ -241,7 +267,7 @@ function NetworkComponent() {
       <Grid container spacing={3}>
         {/* 代理状态卡片 */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card>
+          <Card sx={{ height: "100%" }}>
             <CardHeader avatar={<VpnKey color="primary" />} title="代理状态" subheader="当前代理配置信息" />
             <Divider />
             <CardContent>
@@ -288,9 +314,65 @@ function NetworkComponent() {
           </Card>
         </Grid>
 
+        {/* 网络配置卡片 */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card sx={{ height: "100%" }}>
+            <CardHeader
+              avatar={<TimeoutIcon color="primary" />}
+              title="网络配置"
+              subheader="超时、重试和 Cookie 设置"
+            />
+            <Divider />
+            <CardContent>
+              {result?.config ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <TimeoutIcon fontSize="small" color="action" />
+                      <Typography color="text.secondary">超时时间</Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: "monospace" }}>{result.config.timeout} 秒</Typography>
+                  </Box>
+
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <RetryIcon fontSize="small" color="action" />
+                      <Typography color="text.secondary">重试次数</Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: "monospace" }}>{result.config.retry} 次</Typography>
+                  </Box>
+
+                  <Divider sx={{ my: 0.5 }} />
+
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Cookie 配置
+                  </Typography>
+                  {result.config.cookies.map((cookie) => (
+                    <Box key={cookie.site} sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <CookieIcon fontSize="small" color="action" />
+                        <Typography color="text.secondary">{cookie.site.toUpperCase()}</Typography>
+                      </Box>
+                      {cookie.configured ? (
+                        <Chip label="已配置" color="success" size="small" />
+                      ) : (
+                        <Chip label="未配置" color="default" size="small" variant="outlined" />
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Typography color="text.secondary" sx={{ textAlign: "center", py: 2 }}>
+                  点击"开始检测"查看网络配置
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
         {/* 检测统计卡片 */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Card>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card sx={{ height: "100%" }}>
             <CardHeader
               avatar={<NetworkCheck color="primary" />}
               title="检测统计"

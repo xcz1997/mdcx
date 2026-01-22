@@ -1,9 +1,12 @@
 import {
   CleaningServices as CleanIcon,
   Cookie as CookieIcon,
+  Crop as CropIcon,
+  Delete as DeleteIcon,
   Folder as FolderIcon,
   Language as LanguageIcon,
   Link as LinkIcon,
+  DriveFileMove as MoveIcon,
   Movie as MovieIcon,
   Person as PersonIcon,
   PhotoLibrary as PhotoIcon,
@@ -31,8 +34,10 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { manageKodiActorsMutation, showActorListMutation, updateActorPhotosMutation } from "@/api/tools";
 import { WebsiteSchema } from "@/client/schemas.gen";
+import { ImageCropDialog } from "@/features/tools/components/ImageCropDialog";
 import {
   addSubtitlesMutation,
   checkCookiesMutation,
@@ -44,6 +49,7 @@ import {
   manageExtrafanartCopyMutation,
   manageExtrasMutation,
   manageThemeVideosMutation,
+  moveVideosMutation,
   scrapeSingleFileMutation,
   setSiteUrlMutation,
   startScrapeMutation,
@@ -99,6 +105,19 @@ function ToolComponent() {
   const manageExtras = useMutation(manageExtrasMutation());
   const manageExtrafanartCopy = useMutation(manageExtrafanartCopyMutation());
   const manageThemeVideos = useMutation(manageThemeVideosMutation());
+  const moveVideos = useMutation(moveVideosMutation());
+  const [excludeDirs, setExcludeDirs] = useState("");
+
+  // 演员照片相关
+  const manageKodiActors = useMutation(manageKodiActorsMutation());
+  const showActorList = useMutation(showActorListMutation());
+  const updateActorPhotos = useMutation(updateActorPhotosMutation());
+  const [actorListFilterMode, setActorListFilterMode] = useState(0);
+
+  // 图片裁剪工具
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImagePath, setCropImagePath] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleStartScrape = async () => {
     showInfo("正在启动刮削任务...");
@@ -225,6 +244,22 @@ function ToolComponent() {
     }
   };
 
+  const handleMoveVideos = async () => {
+    showInfo("正在启动视频移动任务...");
+    try {
+      // 将逗号或换行分隔的排除目录转换为数组
+      const excludeDirList = excludeDirs
+        .split(/[,\n]/)
+        .map((dir) => dir.trim())
+        .filter((dir) => dir.length > 0);
+      await moveVideos.mutateAsync({ body: { exclude_dirs: excludeDirList } });
+      showSuccess("视频移动任务已启动，正在跳转到日志页面...");
+      setTimeout(() => navigate({ to: "/logs" }), 1000);
+    } catch (error) {
+      showError(`视频移动任务启动失败: ${error}`);
+    }
+  };
+
   const handleManageExtras = async (mode: "add" | "del") => {
     showInfo(`正在启动 extras ${mode === "add" ? "添加" : "删除"}任务...`);
     try {
@@ -257,6 +292,116 @@ function ToolComponent() {
       showError(`主题视频任务启动失败: ${error}`);
     }
   };
+
+  const handleManageKodiActors = async (mode: "add" | "del") => {
+    const action = mode === "add" ? "添加" : "删除";
+    showInfo(`正在启动 Kodi 演员照片${action}任务...`);
+    try {
+      await manageKodiActors.mutateAsync({ body: { mode } });
+      showSuccess(`Kodi 演员照片${action}任务已启动，正在跳转到日志页面...`);
+      setTimeout(() => navigate({ to: "/logs" }), 1000);
+    } catch (error) {
+      showError(`Kodi 演员照片任务启动失败: ${error}`);
+    }
+  };
+
+  const handleShowActorList = async () => {
+    showInfo("正在查询媒体服务器演员列表...");
+    try {
+      await showActorList.mutateAsync({ body: { filter_mode: actorListFilterMode } });
+      showSuccess("演员列表查询任务已启动，正在跳转到日志页面...");
+      setTimeout(() => navigate({ to: "/logs" }), 1000);
+    } catch (error) {
+      showError(`演员列表查询失败: ${error}`);
+    }
+  };
+
+  const handleUpdateActorPhotos = async () => {
+    showInfo("正在启动演员照片补全任务...");
+    try {
+      await updateActorPhotos.mutateAsync();
+      showSuccess("演员照片补全任务已启动，正在跳转到日志页面...");
+      setTimeout(() => navigate({ to: "/logs" }), 1000);
+    } catch (error) {
+      showError(`演员照片补全任务启动失败: ${error}`);
+    }
+  };
+
+  // 图片裁剪工具
+  const handleOpenFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // 创建本地 URL 用于预览
+      const imageUrl = URL.createObjectURL(file);
+      setCropImagePath(imageUrl);
+      setCropDialogOpen(true);
+    }
+    // 重置 input 以便可以再次选择同一文件
+    event.target.value = "";
+  }, []);
+
+  const handleCropSave = useCallback(
+    async (result: { cropBox: { x1: number; y1: number; x2: number; y2: number }; watermarks: string[] }) => {
+      // 使用 Canvas API 在客户端进行裁剪
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = cropImagePath;
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+      });
+
+      const { x1, y1, x2, y2 } = result.cropBox;
+      const cropWidth = x2 - x1;
+      const cropHeight = y2 - y1;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = cropWidth;
+      canvas.height = cropHeight;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        showError("无法创建画布");
+        return;
+      }
+
+      ctx.drawImage(img, x1, y1, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+      // 转换为 Blob 并下载
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "cropped_poster.jpg";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showSuccess("裁剪后的图片已下载");
+          }
+        },
+        "image/jpeg",
+        0.95,
+      );
+    },
+    [cropImagePath, showSuccess, showError],
+  );
+
+  const handleCropDialogClose = useCallback(() => {
+    setCropDialogOpen(false);
+    // 清理 URL
+    if (cropImagePath.startsWith("blob:")) {
+      URL.revokeObjectURL(cropImagePath);
+    }
+    setCropImagePath("");
+  }, [cropImagePath]);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -425,25 +570,121 @@ function ToolComponent() {
         </Grid>
 
         {/* 演员工具 */}
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Card sx={{ height: "100%" }}>
-            <CardHeader avatar={<PersonIcon color="primary" />} title="演员工具" subheader="补全演员信息" />
+        <Grid size={12}>
+          <Card>
+            <CardHeader avatar={<PersonIcon color="primary" />} title="演员工具" subheader="演员信息补全和照片管理" />
             <Divider />
             <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                扫描媒体库中的演员信息，自动补全缺失的演员数据。
-              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {/* 演员信息补全 */}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    演员信息补全
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    扫描媒体库中的演员信息，自动补全缺失的演员数据。
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PersonIcon />}
+                    onClick={handleCompleteActors}
+                    disabled={completeActors.isPending}
+                  >
+                    {completeActors.isPending ? "正在补全..." : "补全演员信息"}
+                  </Button>
+                </Box>
+
+                <Divider />
+
+                {/* Kodi/Plex 演员照片管理 */}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Kodi/Plex 演员照片管理
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    为待刮削目录中的每个视频创建 .actors 文件夹并补全演员图片（适用于 Kodi/Plex/Jvedio）。
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<PhotoIcon />}
+                      onClick={() => handleManageKodiActors("add")}
+                      disabled={manageKodiActors.isPending}
+                    >
+                      添加演员照片
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={() => handleManageKodiActors("del")}
+                      disabled={manageKodiActors.isPending}
+                    >
+                      删除 .actors 文件夹
+                    </Button>
+                  </Box>
+                </Box>
+
+                <Divider />
+
+                {/* Emby/Jellyfin 演员照片补全 */}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Emby/Jellyfin 演员照片补全
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    从 Gfriends 网络头像库或本地头像库补全 Emby/Jellyfin 演员头像。
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PhotoIcon />}
+                    onClick={handleUpdateActorPhotos}
+                    disabled={updateActorPhotos.isPending}
+                  >
+                    {updateActorPhotos.isPending ? "正在补全..." : "补全演员照片"}
+                  </Button>
+                </Box>
+
+                <Divider />
+
+                {/* Emby/Jellyfin 演员列表查询 */}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Emby/Jellyfin 演员列表查询
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    查看媒体服务器中的演员列表，支持按头像和信息状态过滤。
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 2, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
+                      <InputLabel>过滤模式</InputLabel>
+                      <Select
+                        value={actorListFilterMode}
+                        label="过滤模式"
+                        onChange={(e) => setActorListFilterMode(e.target.value as number)}
+                      >
+                        <MenuItem value={0}>所有演员</MenuItem>
+                        <MenuItem value={1}>有头像有信息</MenuItem>
+                        <MenuItem value={2}>没头像有信息</MenuItem>
+                        <MenuItem value={3}>有头像没信息</MenuItem>
+                        <MenuItem value={4}>没头像没信息</MenuItem>
+                        <MenuItem value={5}>有信息</MenuItem>
+                        <MenuItem value={6}>没信息</MenuItem>
+                        <MenuItem value={7}>有头像</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <Button
+                      variant="outlined"
+                      startIcon={<SearchIcon />}
+                      onClick={handleShowActorList}
+                      disabled={showActorList.isPending}
+                    >
+                      {showActorList.isPending ? "正在查询..." : "查询演员列表"}
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
             </CardContent>
-            <CardActions sx={{ px: 2, pb: 2 }}>
-              <Button
-                variant="outlined"
-                startIcon={<PersonIcon />}
-                onClick={handleCompleteActors}
-                disabled={completeActors.isPending}
-              >
-                {completeActors.isPending ? "正在补全..." : "补全演员信息"}
-              </Button>
-            </CardActions>
           </Card>
         </Grid>
 
@@ -568,6 +809,63 @@ function ToolComponent() {
                     </Button>
                   </Box>
                 </Box>
+
+                <Divider />
+
+                {/* 视频移动工具 */}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    视频移动工具
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    将待刮削目录中的视频和字幕文件移动到 Movie_moved 文件夹，便于整理和归档。
+                  </Typography>
+                  <TextField
+                    label="排除目录（可选）"
+                    placeholder="输入要排除的目录，多个用逗号或换行分隔"
+                    value={excludeDirs}
+                    onChange={(e) => setExcludeDirs(e.target.value)}
+                    size="small"
+                    fullWidth
+                    multiline
+                    rows={2}
+                    sx={{ mb: 2 }}
+                    helperText="相对于媒体路径的目录名，如：已整理、done"
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<MoveIcon />}
+                    onClick={handleMoveVideos}
+                    disabled={moveVideos.isPending}
+                  >
+                    {moveVideos.isPending ? "正在移动..." : "移动视频和字幕"}
+                  </Button>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* 图片裁剪工具 */}
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <Card sx={{ height: "100%" }}>
+            <CardHeader avatar={<CropIcon color="primary" />} title="图片裁剪工具" subheader="裁剪图片为封面海报尺寸" />
+            <Divider />
+            <CardContent>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  选择一张图片，按照标准海报比例（2:3）进行裁剪，用于制作影片封面。
+                </Typography>
+                <Button variant="outlined" startIcon={<CropIcon />} onClick={handleOpenFilePicker}>
+                  选择图片
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleFileSelect}
+                />
               </Box>
             </CardContent>
           </Card>
@@ -642,6 +940,15 @@ function ToolComponent() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* 图片裁剪对话框 */}
+      <ImageCropDialog
+        open={cropDialogOpen}
+        onClose={handleCropDialogClose}
+        imagePath={cropImagePath}
+        imageType="poster"
+        onSave={handleCropSave}
+      />
     </Box>
   );
 }

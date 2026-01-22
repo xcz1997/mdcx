@@ -5,6 +5,7 @@
 
 import {
   Folder as FolderIcon,
+  Pause as PauseIcon,
   Refresh as RefreshIcon,
   PlayArrow as StartIcon,
   Stop as StopIcon,
@@ -20,8 +21,11 @@ interface ScrapeControlProps {
   failed: number;
   progress: number;
   scrapeInfo: string;
+  mediaPath?: string;
   onStart: () => void;
   onStop: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onClear: () => void;
   onSelectFolder?: () => void;
   disabled?: boolean;
@@ -67,20 +71,24 @@ export function ScrapeControl({
   failed,
   progress,
   scrapeInfo,
+  mediaPath,
   onStart,
   onStop,
+  onPause,
+  onResume,
   onClear,
   onSelectFolder,
   disabled,
 }: ScrapeControlProps) {
   const isScraping = status === "scraping";
+  const isPaused = status === "paused";
   const isStopping = status === "stopping";
   const isIdle = status === "idle";
 
   return (
     <Paper sx={{ p: 2 }}>
       {/* 控制按钮 */}
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
         {isIdle && (
           <>
             <Button variant="contained" color="primary" startIcon={<StartIcon />} onClick={onStart} disabled={disabled}>
@@ -88,7 +96,7 @@ export function ScrapeControl({
             </Button>
             {onSelectFolder && (
               <Button variant="outlined" startIcon={<FolderIcon />} onClick={onSelectFolder} disabled={disabled}>
-                选择文件夹
+                {mediaPath || "选择文件夹"}
               </Button>
             )}
             {(success > 0 || failed > 0) && (
@@ -99,9 +107,24 @@ export function ScrapeControl({
           </>
         )}
         {isScraping && (
-          <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={onStop}>
-            停止刮削
-          </Button>
+          <>
+            <Button variant="contained" color="warning" startIcon={<PauseIcon />} onClick={onPause}>
+              暂停刮削
+            </Button>
+            <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={onStop}>
+              停止刮削
+            </Button>
+          </>
+        )}
+        {isPaused && (
+          <>
+            <Button variant="contained" color="success" startIcon={<StartIcon />} onClick={onResume}>
+              恢复刮削
+            </Button>
+            <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={onStop}>
+              停止刮削
+            </Button>
+          </>
         )}
         {isStopping && (
           <Button variant="contained" color="warning" disabled startIcon={<StopIcon />}>
@@ -111,12 +134,12 @@ export function ScrapeControl({
       </Box>
 
       {/* 进度条 */}
-      {(isScraping || isStopping || total > 0) && (
+      {(isScraping || isPaused || isStopping || total > 0) && (
         <>
           <ProgressBar
             variant="determinate"
             value={progress}
-            color={isStopping ? "warning" : isScraping ? "primary" : "success"}
+            color={isStopping ? "warning" : isPaused ? "info" : isScraping ? "primary" : "success"}
           />
           <Typography variant="caption" color="text.secondary">
             {current} / {total} ({progress}%)

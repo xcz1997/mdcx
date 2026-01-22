@@ -47,12 +47,28 @@ class ProxyStatus(BaseModel):
     status: SiteStatus = Field(default=SiteStatus.OK, description="代理状态")
 
 
+class CookieStatus(BaseModel):
+    """Cookie 配置状态"""
+
+    site: str = Field(description="网站名称")
+    configured: bool = Field(description="是否已配置 Cookie")
+
+
+class NetworkConfigStatus(BaseModel):
+    """网络配置状态"""
+
+    timeout: int = Field(description="超时时间(秒)")
+    retry: int = Field(description="重试次数")
+    cookies: list[CookieStatus] = Field(default_factory=list, description="Cookie 配置状态")
+
+
 class NetworkCheckResponse(BaseModel):
     """网络检测响应"""
 
     proxy: ProxyStatus = Field(description="代理状态")
     sites: list[SiteCheckResult] = Field(default_factory=list, description="各网站检测结果")
     elapsed: float = Field(description="检测用时(秒)")
+    config: NetworkConfigStatus | None = Field(default=None, description="网络配置状态")
 
 
 class NetworkCheckRequest(BaseModel):
@@ -154,6 +170,23 @@ def _get_proxy_status() -> ProxyStatus:
         return ProxyStatus(enabled=False)
 
 
+def _get_config_status() -> NetworkConfigStatus:
+    """获取网络配置状态"""
+    try:
+        timeout = manager.config.timeout
+        retry = manager.config.retry
+
+        # 检查 Cookie 配置
+        cookies = [
+            CookieStatus(site="javdb", configured=bool(manager.config.javdb_cookie)),
+            CookieStatus(site="javbus", configured=bool(manager.config.javbus_cookie)),
+        ]
+
+        return NetworkConfigStatus(timeout=timeout, retry=retry, cookies=cookies)
+    except Exception:
+        return NetworkConfigStatus(timeout=10, retry=3, cookies=[])
+
+
 @router.post("/check", summary="网络连通性检测", operation_id="checkNetwork", response_model=NetworkCheckResponse)
 async def check_network(body: NetworkCheckRequest | None = None):
     """
@@ -186,7 +219,10 @@ async def check_network(body: NetworkCheckRequest | None = None):
 
         elapsed = round(time.time() - start_time, 2)
 
-        return NetworkCheckResponse(proxy=proxy_status, sites=results, elapsed=elapsed)
+        # 获取网络配置状态
+        config_status = _get_config_status()
+
+        return NetworkCheckResponse(proxy=proxy_status, sites=results, elapsed=elapsed, config=config_status)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -197,5 +233,14 @@ async def get_proxy_status():
     """获取当前代理配置状态"""
     try:
         return _get_proxy_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/config", summary="获取网络配置状态", operation_id="getNetworkConfig", response_model=NetworkConfigStatus)
+async def get_network_config():
+    """获取网络配置状态（超时、重试、Cookie 配置）"""
+    try:
+        return _get_config_status()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

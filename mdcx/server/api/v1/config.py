@@ -7,10 +7,59 @@ from pydantic import BaseModel, Field
 from mdcx.config.manager import manager
 from mdcx.config.models import Config
 from mdcx.config.v1 import ConfigV1
+from mdcx.consts import LOCAL_VERSION
 
 from .utils import check_path_access
 
 router = APIRouter(prefix="/config", tags=["配置管理"])
+
+
+class VersionResponse(BaseModel):
+    version: str = Field(description="版本号")
+    version_code: int = Field(description="版本号数值")
+
+
+@router.get("/version", operation_id="getVersion", summary="获取版本信息")
+async def get_version() -> VersionResponse:
+    """获取应用版本信息"""
+    # LOCAL_VERSION 格式如 220250909，转换为 2.20250909 格式
+    version_str = str(LOCAL_VERSION)
+    # 格式化为 "vX.YYYYMMDD"
+    formatted_version = f"v{version_str[0]}.{version_str[1:]}"
+    return VersionResponse(version=formatted_version, version_code=LOCAL_VERSION)
+
+
+class ConfigFileInfo(BaseModel):
+    name: str = Field(description="配置文件名 (不含扩展名)")
+    filename: str = Field(description="完整文件名 (含扩展名)")
+    is_active: bool = Field(description="是否为当前激活的配置文件")
+
+
+class ConfigListResponse(BaseModel):
+    configs: list[ConfigFileInfo] = Field(description="配置文件列表")
+    active: str = Field(description="当前激活的配置文件名 (不含扩展名)")
+
+
+@router.get("/list", operation_id="listConfigs", summary="获取配置文件列表")
+async def list_configs() -> ConfigListResponse:
+    """列出所有可用的配置文件"""
+    files = manager.list_configs()
+    active_file = manager.file
+    configs = []
+    for f in files:
+        # 移除扩展名得到名称
+        name = f.rsplit(".", 1)[0] if "." in f else f
+        configs.append(
+            ConfigFileInfo(
+                name=name,
+                filename=f,
+                is_active=(f == active_file),
+            )
+        )
+    # 按名称排序，但激活的排在第一位
+    configs.sort(key=lambda x: (not x.is_active, x.name))
+    active_name = active_file.rsplit(".", 1)[0] if "." in active_file else active_file
+    return ConfigListResponse(configs=configs, active=active_name)
 
 
 @router.get("/", operation_id="getCurrentConfig", summary="获取当前配置")

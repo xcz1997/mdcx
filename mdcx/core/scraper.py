@@ -231,6 +231,7 @@ class Scraper:
             and Switch.REST_SCRAPE in manager.config.switch_on
             and count - Flags.rest_now_begin_count > manager.config.rest_count
         ):
+            await self._wait_if_paused(show_name)
             self._check_stop(show_name)
             await asyncio.sleep(1)
 
@@ -252,6 +253,7 @@ class Scraper:
                 f" ⏱ {get_current_time()}（{remain_time}）秒后开始刮削：{count}/{count_all} {show_name}"
             )
             for i in range(remain_time):
+                await self._wait_if_paused(show_name)
                 self._check_stop(show_name)
                 await asyncio.sleep(1)
 
@@ -409,6 +411,7 @@ class Scraper:
                         ):
                             if Flags.scrape_starting > count:  # 如果突然调大了文件数量，这时跳出休眠
                                 break
+                            await self._wait_if_paused(show_name)
                             await asyncio.sleep(1)
                         Flags.rest_now_begin_count = count
                         Flags.sleep_end.set()  # 休眠结束，下一轮开始
@@ -773,6 +776,16 @@ class Scraper:
                 f"⛔️ 正在停止刮削...\n   正在停止已在运行的任务线程（{Flags.now_kill}/{Flags.total_kills}）..."
             )
             raise StopScrape("手动停止刮削")
+
+    async def _wait_if_paused(self, show_name: str) -> None:
+        """如果处于暂停状态，等待恢复"""
+        if Flags.is_paused:
+            signal.show_log_text(f" ⏸ {get_current_time()} 刮削已暂停：{show_name}")
+            signal.set_label_file_path.emit(f"⏸ 刮削已暂停，等待恢复...")
+            # 等待恢复事件
+            await Flags.pause_event.wait()
+            if not signal.stop:  # 如果不是停止，显示恢复信息
+                signal.show_log_text(f" ▶ {get_current_time()} 刮削已恢复：{show_name}")
 
     async def _failed_file_info_show(self, count: str, p: Path, error_info: str) -> None:
         info_str = f"{'🔴 ' + count + '.':<3} {p} \n    所在目录: {p.parent} \n    失败原因: {error_info} \n"

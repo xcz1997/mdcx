@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
-export type ScrapeStatus = "idle" | "scraping" | "stopping";
+export type ScrapeStatus = "idle" | "scraping" | "paused" | "stopping";
 
 export interface ScrapeResultItem {
   id: string;
@@ -29,6 +29,7 @@ export interface MediaInfo {
   series: string;
   publisher: string;
   source: string;
+  score?: number;
   posterUrl?: string;
   thumbUrl?: string;
   filePath?: string;
