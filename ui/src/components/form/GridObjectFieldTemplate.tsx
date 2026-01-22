@@ -56,37 +56,34 @@ function getFieldSchema(content: ReactElement): RJSFSchema {
 /**
  * Grid 布局的 ObjectFieldTemplate
  * 短字段并排显示，长字段占整行
+ * 注意：不渲染 title 和 description，因为外层卡片已经有标题
  */
 export function GridObjectFieldTemplate(props: ObjectFieldTemplateProps) {
-  const { properties, title, description, uiSchema } = props;
+  const { properties, uiSchema } = props;
 
   return (
-    <div>
-      {title && <h3 style={{ marginBottom: 16 }}>{title}</h3>}
-      {description && <p style={{ marginBottom: 16, color: "rgba(0,0,0,0.6)" }}>{description}</p>}
-      <Grid container spacing={2}>
-        {properties.map((prop) => {
-          const fieldUiSchema = uiSchema?.[prop.name] as
-            | { "ui:widget"?: string; "ui:options"?: { rows?: number } }
-            | undefined;
-          const fieldSchema = getFieldSchema(prop.content);
-          const isFullWidth = shouldBeFullWidth(prop.name, fieldSchema, fieldUiSchema);
+    <Grid container spacing={2}>
+      {properties.map((prop) => {
+        const fieldUiSchema = uiSchema?.[prop.name] as
+          | { "ui:widget"?: string; "ui:options"?: { rows?: number } }
+          | undefined;
+        const fieldSchema = getFieldSchema(prop.content);
+        const isFullWidth = shouldBeFullWidth(prop.name, fieldSchema, fieldUiSchema);
 
-          return (
-            <Grid
-              key={prop.name}
-              size={{
-                xs: 12,
-                sm: isFullWidth ? 12 : 6,
-                md: isFullWidth ? 12 : 6,
-                lg: isFullWidth ? 12 : 6,
-              }}
-            >
-              {prop.content}
-            </Grid>
-          );
-        })}
-      </Grid>
-    </div>
+        return (
+          <Grid
+            key={prop.name}
+            size={{
+              xs: 12,
+              sm: isFullWidth ? 12 : 6,
+              md: isFullWidth ? 12 : 6,
+              lg: isFullWidth ? 12 : 6,
+            }}
+          >
+            {prop.content}
+          </Grid>
+        );
+      })}
+    </Grid>
   );
 }

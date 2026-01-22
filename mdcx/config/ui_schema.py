@@ -199,3 +199,37 @@ def BoolSelect(
         配置了下拉框 UI 的 Field
     """
     return IntSelect(default, title=title, description=description, options=[(0, false_label), (1, true_label)])
+
+
+def IntSlider(
+    default: int,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    min_val: int = 0,
+    max_val: int = 100,
+    step: int = 1,
+    unit: str = "",
+) -> int:
+    """
+    创建一个整数字段，在 UI 中显示为滑块控件（复刻 Qt5 GUI 的 QSlider）。
+
+    Args:
+        default: 默认值
+        title: 字段标题
+        description: 字段描述
+        min_val: 最小值
+        max_val: 最大值
+        step: 步长
+        unit: 单位（如 "秒"、"个"）
+
+    Returns:
+        配置了滑块 UI 的 Field
+    """
+    custom_props = {"min": min_val, "max": max_val, "step": step, "unit": unit}
+    json_schema_extra: dict[str, Any] = {
+        "uiSchema": {"customProps": custom_props, "ui:field": "slider"},
+        "minimum": min_val,
+        "maximum": max_val,
+    }
+    return Field(default=default, title=title, description=description, json_schema_extra=json_schema_extra)  # type: ignore

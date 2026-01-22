@@ -31,7 +31,7 @@ from .enums import (
     Translator,
     Website,
 )
-from .ui_schema import BoolSelect, IntSelect, ServerPathDirectory, extract_ui_schema_recursive
+from .ui_schema import BoolSelect, IntSelect, IntSlider, ServerPathDirectory, extract_ui_schema_recursive
 
 
 def str_to_list(v: str | list[Any] | None, sep: Literal[",", "|"] = ",", unique: bool = True) -> list[str]:
@@ -215,9 +215,9 @@ class Config(BaseModel):
     # endregion
 
     # region: Scraping Settings
-    thread_number: int = Field(default=50, title="并发数", description="同时刮削的最大并发任务数")
-    thread_time: int = Field(default=0, title="线程时间", description="每个线程执行间隔(秒), 0表示无间隔")
-    javdb_time: int = Field(default=10, title="Javdb时间", description="访问JavDB时的请求间隔(秒)")
+    thread_number: int = IntSlider(default=50, min_val=1, max_val=100, title="并发数", description="同时刮削的最大并发任务数")
+    thread_time: int = IntSlider(default=0, min_val=0, max_val=100, title="线程间隔", unit="秒", description="每个线程执行间隔(秒), 0表示无间隔")
+    javdb_time: int = IntSlider(default=10, min_val=0, max_val=100, title="JAVDB间隔", unit="秒", description="访问JavDB时的请求间隔(秒)")
     main_mode: int = IntSelect(
         default=1,
         title="刮削模式",
@@ -442,7 +442,7 @@ class Config(BaseModel):
             CrawlerResultFields.SCORE: FieldConfig(site_prority=[Website.THEPORNDB, Website.DMM, Website.JAVDB]),
             CrawlerResultFields.WANTED: FieldConfig(site_prority=[Website.DMM, Website.JAVDB]),
         },
-        title="字段配置",
+        json_schema_extra={"uiSchema": {"ui:field": "fieldConfigs"}},
     )
 
     site_configs: dict[Website, SiteConfig] = Field(
@@ -594,7 +594,7 @@ class Config(BaseModel):
     poster_mark: int = BoolSelect(default=1, title="海报水印", description="是否在海报图片上添加水印", false_label="不添加", true_label="添加")
     thumb_mark: int = BoolSelect(default=1, title="缩略图水印", description="是否在缩略图上添加水印", false_label="不添加", true_label="添加")
     fanart_mark: int = BoolSelect(default=0, title="背景图水印", description="是否在背景图上添加水印", false_label="不添加", true_label="添加")
-    mark_size: int = Field(default=5, title="水印大小")
+    mark_size: int = IntSlider(default=5, min_val=1, max_val=40, title="水印大小", description="水印图片的显示高度 = 设置的水印大小 / 40 * 封面图高度")
     mark_type: list[MarkType] = Field(
         default_factory=lambda: [
             MarkType.SUB,
@@ -621,8 +621,8 @@ class Config(BaseModel):
     # region: Network Settings
     use_proxy: bool = Field(default=False, title="使用代理", description="是否使用代理服务器访问网站")
     proxy: str = Field(default="http://127.0.0.1:7890", title="代理地址", description="代理服务器地址, 支持 http/https/socks5 协议")
-    timeout: int = Field(default=10, title="超时", description="网络请求超时时间(秒)")
-    retry: int = Field(default=3, title="重试", description="网络请求失败后的最大重试次数")
+    timeout: int = IntSlider(default=10, min_val=3, max_val=30, title="超时时间", unit="秒", description="网络请求超时时间(秒)")
+    retry: int = IntSlider(default=3, min_val=2, max_val=5, title="重试次数", unit="次", description="网络请求失败后的最大重试次数")
     theporndb_api_token: str = Field(default="", title="Theporndb API令牌")
     javdb: str = Field(default="", title="Javdb")
     javbus: str = Field(default="", title="Javbus")

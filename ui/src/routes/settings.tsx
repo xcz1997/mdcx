@@ -3,8 +3,8 @@ import {
   CleaningServices as CleanIcon,
   ContentCut as CropIcon,
   Delete as DeleteIcon,
-  DriveFileMove as MoveIcon,
   Link as LinkIcon,
+  DriveFileMove as MoveIcon,
   Movie as MovieIcon,
   Person as PersonIcon,
   PhotoLibrary as PhotoIcon,
@@ -26,10 +26,13 @@ import {
   DialogTitle,
   FormControl,
   FormControlLabel,
+  FormLabel,
   Grid,
   IconButton,
   InputLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Tab,
   Tabs,
@@ -44,11 +47,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useBlocker, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { listConfigsOptions } from "@/api/config";
-import {
-  manageKodiActorsMutation,
-  showActorListMutation,
-  updateActorPhotosMutation,
-} from "@/api/tools";
+import { manageKodiActorsMutation, showActorListMutation, updateActorPhotosMutation } from "@/api/tools";
 import {
   addSubtitlesMutation,
   cleanFilesMutation,
@@ -98,6 +97,7 @@ interface FieldGroup {
   fields: string[];
   description?: string;
   isToolCard?: boolean;
+  halfWidth?: boolean; // 强制占半行宽度
 }
 
 interface TabConfig {
@@ -112,15 +112,45 @@ const TAB_CONFIGS: TabConfig[] = [
     label: "刮削目录",
     groups: [
       // 工具卡片 (前 5 个)
-      { title: "单文件刮削", fields: [], isToolCard: true, description: "指定某个文件的番号网址进行刮削，当存在相同番号时可用这个" },
+      {
+        title: "单文件刮削",
+        fields: [],
+        isToolCard: true,
+        description: "指定某个文件的番号网址进行刮削，当存在相同番号时可用这个",
+      },
       { title: "裁剪图片", fields: [], isToolCard: true, description: "将某个图片裁剪为封面图大小，支持加水印" },
       { title: "检查演员缺失番号", fields: [], isToolCard: true, description: "检查资源库中指定演员本地缺失的番号" },
-      { title: "移动视频、字幕", fields: [], isToolCard: true, description: "将待刮削目录下所有子目录中的视频移动到一个目录中以方便进行查看" },
-      { title: "软链接助手", fields: [], isToolCard: true, description: "将挂载的网盘文件目录及子目录中的所有视频一键创建软链接到本地" },
+      {
+        title: "移动视频、字幕",
+        fields: [],
+        isToolCard: true,
+        description: "将待刮削目录下所有子目录中的视频移动到一个目录中以方便进行查看",
+      },
+      {
+        title: "软链接助手",
+        fields: [],
+        isToolCard: true,
+        description: "将挂载的网盘文件目录及子目录中的所有视频一键创建软链接到本地",
+      },
       // 设置卡片 (后 4 个)
-      { title: "刮削目录", fields: ["media_path", "softlink_path", "success_output_folder", "failed_output_folder", "extrafanart_folder"] },
+      {
+        title: "刮削目录",
+        fields: ["media_path", "softlink_path", "success_output_folder", "failed_output_folder", "extrafanart_folder"],
+      },
       { title: "文件扫描设置", fields: ["folders", "string", "file_size", "no_escape"] },
-      { title: "文件清理设置", fields: ["clean_enable", "clean_ext", "clean_name", "clean_contains", "clean_size", "clean_ignore_ext", "clean_ignore_contains"], isToolCard: true },
+      {
+        title: "文件清理设置",
+        fields: [
+          "clean_enable",
+          "clean_ext",
+          "clean_name",
+          "clean_contains",
+          "clean_size",
+          "clean_ignore_ext",
+          "clean_ignore_contains",
+        ],
+        isToolCard: true,
+      },
       { title: "文件格式设置", fields: ["media_type", "sub_type"] },
     ],
   },
@@ -132,7 +162,18 @@ const TAB_CONFIGS: TabConfig[] = [
       { title: "刮削成功后移动文件", fields: ["success_file_move"], isToolCard: true },
       { title: "刮削失败时移动文件", fields: ["failed_file_move"], isToolCard: true },
       { title: "刮削结束后删除空文件夹", fields: ["del_empty_folder"], isToolCard: true },
-      { title: "更新模式规则", fields: ["update_mode", "update_a_folder", "update_b_folder", "update_c_filetemplate", "update_d_folder", "update_titletemplate"], isToolCard: true },
+      {
+        title: "更新模式规则",
+        fields: [
+          "update_mode",
+          "update_a_folder",
+          "update_b_folder",
+          "update_c_filetemplate",
+          "update_d_folder",
+          "update_titletemplate",
+        ],
+        isToolCard: true,
+      },
       { title: "刮削成功后重命名文件", fields: ["success_file_rename"], isToolCard: true },
       { title: "多线程刮削", fields: ["thread_number", "thread_time", "javdb_time"] },
       { title: "刮削成功后在输出目录创建软链接或硬链接", fields: ["soft_link"], isToolCard: true },
@@ -142,9 +183,26 @@ const TAB_CONFIGS: TabConfig[] = [
     id: "scrape_site",
     label: "刮削网站",
     groups: [
-      { title: "类型刮削网站", fields: ["website_youma", "website_wuma", "website_suren", "website_fc2", "website_oumei", "website_guochan"], isToolCard: true },
-      { title: "字段刮削网站", fields: ["field_configs"], isToolCard: true },
-      { title: "网站偏好", fields: ["scrape_like", "website_single", "title_sehua", "title_yesjav", "title_sehua_zh", "actor_realname", "outline_format"], isToolCard: true },
+      {
+        title: "类型刮削网站",
+        fields: ["website_youma", "website_wuma", "website_suren", "website_fc2", "website_oumei", "website_guochan"],
+        isToolCard: true,
+      },
+      { title: "字段刮削网站", fields: ["field_configs"], isToolCard: true, halfWidth: true },
+      {
+        title: "网站偏好",
+        fields: [
+          "scrape_like",
+          "website_single",
+          "title_sehua",
+          "title_yesjav",
+          "title_sehua_zh",
+          "actor_realname",
+          "outline_format",
+        ],
+        isToolCard: true,
+        halfWidth: true,
+      },
     ],
   },
   {
@@ -163,7 +221,11 @@ const TAB_CONFIGS: TabConfig[] = [
     id: "naming",
     label: "命名",
     groups: [
-      { title: "视频命名规则", fields: ["folder_name", "naming_file", "naming_media", "prevent_char", "fields_rule"], isToolCard: true },
+      {
+        title: "视频命名规则",
+        fields: ["folder_name", "naming_file", "naming_media", "prevent_char", "fields_rule"],
+        isToolCard: true,
+      },
       { title: "分集命名规则", fields: ["cd_name", "cd_char"], isToolCard: true },
       { title: "长度命名规则", fields: ["folder_name_max", "file_name_max", "actor_name_max", "actor_name_more"] },
       { title: "马赛克命名规则", fields: ["umr_style", "leak_style", "wuma_style", "youma_style"], isToolCard: true },
@@ -178,33 +240,80 @@ const TAB_CONFIGS: TabConfig[] = [
     id: "translate",
     label: "翻译",
     groups: [
-      { title: "翻译引擎", fields: ["translate_config"], isToolCard: true },
+      { title: "翻译引擎", fields: ["translate_config.translate_by", "translate_config.deepl_key"], isToolCard: true },
+      {
+        title: "LLM 翻译",
+        fields: [
+          "translate_config.llm_url",
+          "translate_config.llm_model",
+          "translate_config.llm_key",
+          "translate_config.llm_prompt",
+          "translate_config.llm_max_req_sec",
+          "translate_config.llm_max_try",
+          "translate_config.llm_temperature",
+        ],
+        isToolCard: true,
+      },
+      { title: "标题", fields: ["title_sehua", "title_yesjav", "title_sehua_zh"], isToolCard: true },
+      { title: "简介", fields: ["outline_format"], isToolCard: true },
+      { title: "演员", fields: ["actor_realname"], isToolCard: true },
+      { title: "标签", fields: [], isToolCard: true },
+      { title: "系列", fields: [], isToolCard: true },
+      { title: "片商", fields: [], isToolCard: true },
+      { title: "发行商", fields: [], isToolCard: true },
+      { title: "导演", fields: [], isToolCard: true },
     ],
   },
   {
     id: "subtitle",
     label: "字幕",
     groups: [
-      { title: "中文字幕字符规则", fields: ["cnword_char", "cnword_style", "folder_cnword", "file_cnword"], isToolCard: true },
-      { title: "添加外挂字幕", fields: ["subtitle_folder", "subtitle_add", "subtitle_add_chs", "subtitle_add_rescrape"], isToolCard: true },
+      {
+        title: "中文字幕字符规则",
+        fields: ["cnword_char", "cnword_style", "folder_cnword", "file_cnword"],
+        isToolCard: true,
+      },
+      {
+        title: "添加外挂字幕",
+        fields: ["subtitle_folder", "subtitle_add", "subtitle_add_chs", "subtitle_add_rescrape"],
+        isToolCard: true,
+      },
     ],
   },
   {
     id: "watermark",
     label: "水印",
     groups: [
-      { title: "自定义水印样式", fields: [], isToolCard: true },
-      { title: "水印设置", fields: ["poster_mark", "thumb_mark", "fanart_mark", "mark_size", "mark_type"], isToolCard: true },
+      // Qt5 顺序：水印设置 -> 不固定位置 -> 固定一个位置 -> 固定不同位置 -> 自定义水印样式
+      {
+        title: "水印设置",
+        fields: ["poster_mark", "thumb_mark", "fanart_mark", "mark_size", "mark_type", "mark_fixed"],
+        isToolCard: true,
+      },
       { title: "不固定位置", fields: ["mark_pos"], isToolCard: true },
+      { title: "固定一个位置", fields: ["mark_pos_corner"], isToolCard: true },
       { title: "固定不同位置", fields: ["mark_pos_sub", "mark_pos_mosaic", "mark_pos_hd"], isToolCard: true },
-      { title: "固定一个位置", fields: ["mark_fixed", "mark_pos_corner"], isToolCard: true },
+      { title: "自定义水印样式", fields: [], isToolCard: true },
     ],
   },
   {
     id: "nfo",
     label: "NFO",
     groups: [
-      { title: "写入 NFO 的字段", fields: ["nfo_include_new", "nfo_tagline", "nfo_tag_include", "nfo_tag_series", "nfo_tag_studio", "nfo_tag_publisher", "nfo_tag_actor", "nfo_tag_actor_contains"], isToolCard: true },
+      {
+        title: "写入 NFO 的字段",
+        fields: [
+          "nfo_include_new",
+          "nfo_tagline",
+          "nfo_tag_include",
+          "nfo_tag_series",
+          "nfo_tag_studio",
+          "nfo_tag_publisher",
+          "nfo_tag_actor",
+          "nfo_tag_actor_contains",
+        ],
+        isToolCard: true,
+      },
     ],
   },
   {
@@ -212,7 +321,11 @@ const TAB_CONFIGS: TabConfig[] = [
     label: "演员",
     groups: [
       { title: "Emby/Jellyfin 设置", fields: ["server_type", "emby_url", "api_key", "user_id"], isToolCard: true },
-      { title: "补全 Emby/Jellyfin 演员头像", fields: ["emby_on", "gfriends_github", "actor_photo_folder"], isToolCard: true },
+      {
+        title: "补全 Emby/Jellyfin 演员头像",
+        fields: ["emby_on", "gfriends_github", "actor_photo_folder"],
+        isToolCard: true,
+      },
       { title: "补全 Emby/Jellyfin 演员信息", fields: ["use_database", "info_database_path"], isToolCard: true },
       { title: "补全 Kodi/Plex/Jvedio 演员头像", fields: ["actor_photo_kodi_auto"], isToolCard: true },
     ],
@@ -234,42 +347,108 @@ const TAB_CONFIGS: TabConfig[] = [
       { title: "保存日志", fields: ["save_log"] },
       { title: "调试模式（日志页面）", fields: ["show_web_log", "show_from_log", "show_data_log"], isToolCard: true },
       { title: "检查更新", fields: ["update_check"] },
-      { title: "高级功能", fields: ["switch_on", "timed_interval", "rest_count", "rest_time", "local_library", "netdisk_path", "localdisk_path", "window_title"] },
+      { title: "定时刮削", fields: [], isToolCard: true },
+      { title: "间歇刮削", fields: [], isToolCard: true },
+      {
+        title: "高级功能",
+        fields: ["switch_on", "local_library", "netdisk_path", "localdisk_path", "window_title"],
+        isToolCard: true,
+      },
     ],
   },
 ];
 
-// 根据字段列表过滤 schema
+// 根据字段列表过滤 schema（支持嵌套路径如 "translate_config.deepl_key"）
 function filterSchemaByFields(schema: RJSFSchema, fieldList: string[]): RJSFSchema {
   if (!schema.properties || fieldList.length === 0) return { type: "object", properties: {} };
 
   const filteredProperties: RJSFSchema["properties"] = {};
+  const nestedFields: Record<string, string[]> = {};
 
   for (const field of fieldList) {
-    if (schema.properties[field]) {
+    if (field.includes(".")) {
+      // 嵌套字段：如 "translate_config.deepl_key"
+      const [parent, ...rest] = field.split(".");
+      const childPath = rest.join(".");
+      if (!nestedFields[parent]) {
+        nestedFields[parent] = [];
+      }
+      nestedFields[parent].push(childPath);
+    } else if (schema.properties[field]) {
+      // 顶级字段
       filteredProperties[field] = schema.properties[field];
+    }
+  }
+
+  // 处理嵌套字段
+  for (const [parent, children] of Object.entries(nestedFields)) {
+    const parentSchema = schema.properties[parent] as RJSFSchema | undefined;
+    if (parentSchema?.properties) {
+      const filteredChildProperties: RJSFSchema["properties"] = {};
+      for (const child of children) {
+        if (parentSchema.properties[child]) {
+          filteredChildProperties[child] = parentSchema.properties[child];
+        }
+      }
+      if (Object.keys(filteredChildProperties).length > 0) {
+        filteredProperties[parent] = {
+          ...parentSchema,
+          properties: filteredChildProperties,
+          required: (parentSchema.required as string[] | undefined)?.filter((r) => children.includes(r)),
+        };
+      }
     }
   }
 
   return {
     ...schema,
     properties: filteredProperties,
-    required: (schema.required as string[] | undefined)?.filter((r) => fieldList.includes(r)),
+    required: (schema.required as string[] | undefined)?.filter((r) => fieldList.includes(r) || nestedFields[r]),
   };
 }
 
-// 根据字段列表过滤 uiSchema
+// 根据字段列表过滤 uiSchema（支持嵌套路径如 "translate_config.deepl_key"）
 function filterUiSchemaByFields(uiSchema: UiSchema, fieldList: string[]): UiSchema {
   const filteredUiSchema: UiSchema = {};
+  const nestedFields: Record<string, string[]> = {};
 
   for (const field of fieldList) {
-    if (uiSchema[field]) {
+    if (field.includes(".")) {
+      // 嵌套字段
+      const [parent, ...rest] = field.split(".");
+      const childPath = rest.join(".");
+      if (!nestedFields[parent]) {
+        nestedFields[parent] = [];
+      }
+      nestedFields[parent].push(childPath);
+    } else if (uiSchema[field]) {
+      // 顶级字段
       filteredUiSchema[field] = uiSchema[field];
     }
   }
 
+  // 处理嵌套字段
+  for (const [parent, children] of Object.entries(nestedFields)) {
+    const parentUiSchema = uiSchema[parent] as UiSchema | undefined;
+    if (parentUiSchema) {
+      const filteredChildUiSchema: UiSchema = {};
+      for (const child of children) {
+        if (parentUiSchema[child]) {
+          filteredChildUiSchema[child] = parentUiSchema[child];
+        }
+      }
+      if (Object.keys(filteredChildUiSchema).length > 0) {
+        filteredUiSchema[parent] = filteredChildUiSchema;
+      }
+    }
+  }
+
   if (uiSchema["ui:order"]) {
-    filteredUiSchema["ui:order"] = (uiSchema["ui:order"] as string[]).filter((f) => fieldList.includes(f) || f === "*");
+    const topLevelFields = fieldList.filter((f) => !f.includes("."));
+    const parentFields = Object.keys(nestedFields);
+    filteredUiSchema["ui:order"] = (uiSchema["ui:order"] as string[]).filter(
+      (f) => topLevelFields.includes(f) || parentFields.includes(f) || f === "*",
+    );
   }
 
   return filteredUiSchema;
@@ -305,15 +484,9 @@ interface GroupCardProps {
 }
 
 function GroupCard({ group, schema, uiSchema, formData, onChange, children }: GroupCardProps) {
-  const filteredSchema = useMemo(
-    () => filterSchemaByFields(schema, group.fields),
-    [schema, group.fields]
-  );
+  const filteredSchema = useMemo(() => filterSchemaByFields(schema, group.fields), [schema, group.fields]);
 
-  const filteredUiSchema = useMemo(
-    () => filterUiSchemaByFields(uiSchema, group.fields),
-    [uiSchema, group.fields]
-  );
+  const filteredUiSchema = useMemo(() => filterUiSchemaByFields(uiSchema, group.fields), [uiSchema, group.fields]);
 
   const hasVisibleFields = filteredSchema.properties && Object.keys(filteredSchema.properties).length > 0;
 
@@ -437,7 +610,7 @@ function SettingsComponent() {
         });
       }
     },
-    [originalData]
+    [originalData],
   );
 
   // ============= 配置管理处理函数 =============
@@ -470,7 +643,7 @@ function SettingsComponent() {
         showError(`切换配置失败: ${error}`);
       }
     },
-    [hasChanges, switchConfig, queryClient, showSuccess, showError]
+    [hasChanges, switchConfig, queryClient, showSuccess, showError],
   );
 
   const handleCreateConfig = useCallback(async () => {
@@ -564,7 +737,10 @@ function SettingsComponent() {
   const handleMoveVideos = async () => {
     showInfo("正在启动视频移动任务...");
     try {
-      const excludeDirList = excludeDirs.split(/[,\n]/).map((dir) => dir.trim()).filter((dir) => dir.length > 0);
+      const excludeDirList = excludeDirs
+        .split(/[,\n]/)
+        .map((dir) => dir.trim())
+        .filter((dir) => dir.length > 0);
       await moveVideos.mutateAsync({ body: { exclude_dirs: excludeDirList } });
       showSuccess("视频移动任务已启动");
       setTimeout(() => navigate({ to: "/logs" }), 1000);
@@ -748,10 +924,10 @@ function SettingsComponent() {
           }
         },
         "image/jpeg",
-        0.95
+        0.95,
       );
     },
-    [cropImagePath, showSuccess, showError]
+    [cropImagePath, showSuccess, showError],
   );
 
   const handleCropDialogClose = useCallback(() => {
@@ -900,6 +1076,38 @@ function SettingsComponent() {
           </Button>
         );
       }
+      if (cardTitle === "刮削目录") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>待刮削视频目录：</strong>指含有视频的文件夹，将刮削该目录（含子目录）所有视频的元数据信息
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>排除目录：</strong>指不想要刮削的目录，可以填写多个目录，以逗号分开（中英文逗号都可以）
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>成功输出目录：</strong>指刮削成功时，视频将移动到这个文件夹。输出目录可以不在待刮削视频目录下
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>失败输出目录：</strong>指刮削失败时，视频将移动到这个文件夹。输出目录可以不在待刮削视频目录下
+            </Typography>
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                component="div"
+                sx={{ lineHeight: 1.8, whiteSpace: "pre-line" }}
+              >
+                {`如果创建软链接时要复制图片和NFO，请到「工具」-「软链接助手」勾选即可
+1，软链接路径支持命名字段：
+   end_folder_name （指待刮削目录上最后的文件夹名）
+2，成功/失败输出目录支持命名字段：
+   end_folder_name，first_folder_name （指待刮削目录下第一层子文件夹名）`}
+              </Typography>
+            </Box>
+          </Box>
+        );
+      }
     }
 
     // Tab 2: 刮削模式
@@ -956,9 +1164,7 @@ function SettingsComponent() {
         const failedMove = formData.failed_file_move as boolean;
         return (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {failedMove
-              ? "刮削失败后，移动文件到失败输出目录"
-              : "刮削失败后，不移动文件位置，仍在原目录"}
+            {failedMove ? "刮削失败后，移动文件到失败输出目录" : "刮削失败后，不移动文件位置，仍在原目录"}
           </Typography>
         );
       }
@@ -966,9 +1172,7 @@ function SettingsComponent() {
         const delEmpty = formData.del_empty_folder as boolean;
         return (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {delEmpty
-              ? "刮削结束后，删除刮削目录中的所有空文件夹"
-              : "刮削结束后，不删除空文件夹"}
+            {delEmpty ? "刮削结束后，删除刮削目录中的所有空文件夹" : "刮削结束后，不删除空文件夹"}
           </Typography>
         );
       }
@@ -1045,11 +1249,33 @@ function SettingsComponent() {
         return (
           <Box sx={{ mt: 1 }}>
             <Typography variant="caption" color="text.secondary" component="div" sx={{ lineHeight: 1.8 }}>
-              <p><strong>有码番号</strong>：比如 MIDE-111，以及不符合以下类型的番号</p>
-              <p><strong>素人番号</strong>：比如 259LUXU-1111</p>
-              <p><strong>FC2番号</strong>：比如 FC2-111111</p>
-              <p><strong>欧美番号</strong>：比如 111111-111，111111_111，n1111，HEYZO-1111，SMD-111</p>
-              <p><strong>国产番号</strong>：「网站偏好」-「指定网站」指定 mdtv、hdouban，或文件路径含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号</p>
+              <p>
+                <strong>有码番号</strong>：比如 MIDE-111，以及不符合以下类型的番号
+              </p>
+              <p>
+                <strong>无码番号</strong>：比如 111111-111，111111_111，n1111，HEYZO-1111，SMD-111
+              </p>
+              <p>
+                <strong>素人番号</strong>：比如 259LUXU-1111
+              </p>
+              <p>
+                <strong>FC2番号</strong>：比如 FC2-111111
+              </p>
+              <p>
+                <strong>欧美番号</strong>：比如 111111-111，111111_111，n1111，HEYZO-1111，SMD-111
+              </p>
+              <p>
+                <strong>国产番号</strong>：「网站偏好」-「指定网站」指定
+                mdtv、hdouban，或文件路径含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号
+              </p>
+              <p>
+                <strong>动漫里番</strong>：「网站偏好」-「指定网站」指定
+                getchu、dmm、getchu_dmm，或文件路径含有「里番」、「动漫」时，将自动使用 getchu_dmm（二合一）刮削
+              </p>
+              <p>
+                <strong>Mywife</strong>：「网站偏好」-「指定网站」指定 mywife，或文件路径含有 mywife时，将自动使用
+                mywife 刮削（番号规则：Mywife No.1230）
+              </p>
             </Typography>
           </Box>
         );
@@ -1095,9 +1321,7 @@ function SettingsComponent() {
             </Box>
             {scrapeLike === "info" && (
               <Box sx={{ mt: 2, p: 1.5, bgcolor: "info.main", borderRadius: 1, color: "info.contrastText" }}>
-                <Typography variant="body2">
-                  ⚠️ 注意！选择「字段优先」时，以下设置才有效！
-                </Typography>
+                <Typography variant="body2">⚠️ 注意！选择「字段优先」时，以下设置才有效！</Typography>
               </Box>
             )}
           </Box>
@@ -1111,11 +1335,9 @@ function SettingsComponent() {
         return (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              封面图(poster)：Emby 视图选择封面图时，列表页使用竖图显示；
-              缩略图(thumb)：Emby 视图选择缩略图时，列表页使用横图显示；
-              背景图(fanart)：在 Emby 详情页作为背景图显示；
-              剧照(extrafanart)：在 Emby 详情页作为背景轮播显示；
-              预告片(trailer)：在 Emby 详情页可以播放预告片；
+              封面图(poster)：Emby 视图选择封面图时，列表页使用竖图显示； 缩略图(thumb)：Emby
+              视图选择缩略图时，列表页使用横图显示； 背景图(fanart)：在 Emby 详情页作为背景图显示；
+              剧照(extrafanart)：在 Emby 详情页作为背景轮播显示； 预告片(trailer)：在 Emby 详情页可以播放预告片；
               nfo：包含标题、简介、标签等信息，在 Emby 详情页展示。
             </Typography>
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "warning.main", borderRadius: 1, color: "warning.contrastText" }}>
@@ -1143,6 +1365,18 @@ function SettingsComponent() {
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary">
               将从片商官网和其他一些网站查找高清图，当有高清图片时，下载高清图片
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              启用 Amazon：将从日亚官网搜索高清图，当找到时直接使用日亚结果
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              启用片商官网：将从片商官网搜索高清图，当图片不高清时会继续使用 Google 搜图
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              启用 Google：将使用图片请求 Google 以图搜图
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              关键词过滤：多个以逗号隔开，优先级按照顺序从前往后
             </Typography>
           </Box>
         );
@@ -1179,7 +1413,8 @@ function SettingsComponent() {
         return (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              在 Emby 中，剧照图片作为背景显示，无法手动浏览。如需在 Emby 中手动查看剧照，可复制剧照图片到单独目录，并且媒体库类型选择「家庭视频与照片」。
+              在 Emby 中，剧照图片作为背景显示，无法手动浏览。如需在 Emby
+              中手动查看剧照，可复制剧照图片到单独目录，并且媒体库类型选择「家庭视频与照片」。
               请使用「extrafanart」以外的其他名字。目录名字为空或「extrafanart」时，将不会创建副本目录。
             </Typography>
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
@@ -1208,8 +1443,8 @@ function SettingsComponent() {
         return (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              复制预告片到视频下的 backdrops 目录，当在 Emby 浏览该番号时，预告片会作为背景视频播放。
-              开启主题视频：Emby 设置-显示-主题视频-开（PC 端可以打开，手机端不建议打开，会变成全屏播放）
+              复制预告片到视频下的 backdrops 目录，当在 Emby 浏览该番号时，预告片会作为背景视频播放。 开启主题视频：Emby
+              设置-显示-主题视频-开（PC 端可以打开，手机端不建议打开，会变成全屏播放）
             </Typography>
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <Button
@@ -1241,8 +1476,13 @@ function SettingsComponent() {
         return (
           <Box sx={{ mt: 1, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
             <Typography variant="body2" color="text.secondary" component="div" sx={{ lineHeight: 1.8 }}>
-              <p><strong>可用命名字段</strong>: number, title, actor, studio, publisher, year, month, day, release, runtime, director, series, mosaic, definition, cnword</p>
-              <p><strong>示例</strong>: actor/number title → 明日花绮罗/IPX-001 明日花绮罗超高级风俗</p>
+              <p>
+                <strong>可用命名字段</strong>: number, title, actor, studio, publisher, year, month, day, release,
+                runtime, director, series, mosaic, definition, cnword
+              </p>
+              <p>
+                <strong>示例</strong>: actor/number title → 明日花绮罗/IPX-001 明日花绮罗超高级风俗
+              </p>
             </Typography>
           </Box>
         );
@@ -1277,17 +1517,35 @@ function SettingsComponent() {
       }
       if (cardTitle === "画质命名规则") {
         return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            画质命名方式: 720P/1080P/4K 或 HD/FHD/UHD
-          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              以视频分辨率的高度数值来命名不同画质：720P、1080P、4K、8K
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              以视频清晰度的英文缩写来命名不同画质：HD、FHD、QHD、UHD
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              qHD=540P，HD=720/960P，FHD=1080P，QHD=1440P(2K)，UHD=4K/8K。低于540P时默认使用高度值命名
+            </Typography>
+          </Box>
         );
       }
       if (cardTitle === "其他说明") {
         return (
           <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
-            <Typography variant="body2" color="text.secondary" component="div" sx={{ lineHeight: 1.8 }}>
-              <p><strong>Emby 多版本显示</strong>: 当同一番号有多个版本时，Emby 会自动合并显示</p>
-              <p><strong>分集封面</strong>: 分集视频的封面图会单独显示在 Emby 详情页中</p>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              component="div"
+              sx={{ lineHeight: 1.8, whiteSpace: "pre-line" }}
+            >
+              {`1、多版本显示：
+  1）Emby 支持多版本显示（类似选集），需要：
+  视频文件名的开头部分必须包含视频目录名。（比如：SSIS-111/SSIS-111-4K.mp4）
+  2）分集视频默认会显示为附加视频，如果要以多版本样式显示，分集命名规则还需要选择「-1」
+
+2、分集封面显示：
+  Emby 分集封面需要每个分集都提供图片，图片命名规则需要选择「视频文件名-poster.jpg」`}
             </Typography>
           </Box>
         );
@@ -1296,11 +1554,371 @@ function SettingsComponent() {
 
     // Tab 6: 翻译
     if (tabId === "translate") {
-      if (cardTitle === "翻译引擎") {
+      // 辅助函数：获取字段配置
+      const getFieldConfig = (fieldKey: string) => {
+        const fieldConfigs = (formData.field_configs || {}) as Record<
+          string,
+          { site_prority?: string[]; language?: string; translate?: boolean }
+        >;
+        return fieldConfigs[fieldKey] || { site_prority: [], language: "undefined", translate: true };
+      };
+
+      // 辅助函数：更新字段语言
+      const updateFieldLanguage = (fieldKey: string, language: string) => {
+        const fieldConfigs = (formData.field_configs || {}) as Record<string, unknown>;
+        const config = getFieldConfig(fieldKey);
+        const newFieldConfigs = {
+          ...fieldConfigs,
+          [fieldKey]: { ...config, language },
+        };
+        handleChange({ formData: { ...formData, field_configs: newFieldConfigs } });
+      };
+
+      // 辅助函数：更新字段翻译开关
+      const updateFieldTranslate = (fieldKey: string, translate: boolean) => {
+        const fieldConfigs = (formData.field_configs || {}) as Record<string, unknown>;
+        const config = getFieldConfig(fieldKey);
+        const newFieldConfigs = {
+          ...fieldConfigs,
+          [fieldKey]: { ...config, translate },
+        };
+        handleChange({ formData: { ...formData, field_configs: newFieldConfigs } });
+      };
+
+      // 辅助组件：语言选择
+      const LanguageSelect = ({ fieldKey, label }: { fieldKey: string; label: string }) => {
+        const config = getFieldConfig(fieldKey);
         return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            当勾选多个翻译引擎时，将随机使用所勾选的其中任一翻译引擎进行翻译。
-          </Typography>
+          <FormControl component="fieldset" sx={{ mb: 2 }}>
+            <FormLabel component="legend">{label}</FormLabel>
+            <RadioGroup
+              row
+              value={config.language || "undefined"}
+              onChange={(e) => updateFieldLanguage(fieldKey, e.target.value)}
+            >
+              <FormControlLabel value="zh_cn" control={<Radio size="small" />} label="简体中文" />
+              <FormControlLabel value="zh_tw" control={<Radio size="small" />} label="繁体中文" />
+              <FormControlLabel value="jp" control={<Radio size="small" />} label="日语" />
+            </RadioGroup>
+          </FormControl>
+        );
+      };
+
+      if (cardTitle === "翻译引擎") {
+        const translateConfig = (formData.translate_config || {}) as {
+          translate_by?: string[];
+          deepl_key?: string;
+        };
+        const translateBy = translateConfig.translate_by || [];
+        const deeplKey = translateConfig.deepl_key || "";
+
+        const translators = [
+          { value: "youdao", label: "有道" },
+          { value: "google", label: "谷歌" },
+          { value: "deepl", label: "Deepl" },
+          { value: "llm", label: "LLM" },
+        ];
+
+        const handleTranslatorChange = (translator: string, checked: boolean) => {
+          const newTranslateBy = checked
+            ? [...translateBy, translator]
+            : translateBy.filter((t) => t !== translator);
+          handleChange({
+            formData: {
+              ...formData,
+              translate_config: { ...translateConfig, translate_by: newTranslateBy },
+            },
+          });
+        };
+
+        const handleDeeplKeyChange = (value: string) => {
+          handleChange({
+            formData: {
+              ...formData,
+              translate_config: { ...translateConfig, deepl_key: value },
+            },
+          });
+        };
+
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+              {translators.map((t) => (
+                <FormControlLabel
+                  key={t.value}
+                  control={
+                    <Checkbox
+                      checked={translateBy.includes(t.value)}
+                      onChange={(e) => handleTranslatorChange(t.value, e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={t.label}
+                />
+              ))}
+            </Box>
+            <TextField
+              label="Deepl Key"
+              value={deeplKey}
+              onChange={(e) => handleDeeplKeyChange(e.target.value)}
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <Typography variant="body2" color="text.secondary">
+              当勾选多个时，将随机使用所勾选的其中任一翻译引擎，可降低被封几率
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              填写免费或付费 key 时，将使用 API 翻译；不填写时，将使用网页端口翻译。
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "LLM 翻译") {
+        const translateConfig = (formData.translate_config || {}) as {
+          llm_url?: string;
+          llm_model?: string;
+          llm_key?: string;
+          llm_prompt?: string;
+          llm_max_req_sec?: number;
+          llm_max_try?: number;
+          llm_temperature?: number;
+        };
+
+        const handleLLMConfigChange = (field: string, value: string | number) => {
+          handleChange({
+            formData: {
+              ...formData,
+              translate_config: { ...translateConfig, [field]: value },
+            },
+          });
+        };
+
+        return (
+          <Box sx={{ mt: 1 }}>
+            <TextField
+              label="API URL"
+              value={translateConfig.llm_url || "https://api.openai.com/v1"}
+              onChange={(e) => handleLLMConfigChange("llm_url", e.target.value)}
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+              helperText="示例: https://api.openai.com/v1"
+            />
+            <TextField
+              label="模型 ID"
+              value={translateConfig.llm_model || "gpt-3.5-turbo"}
+              onChange={(e) => handleLLMConfigChange("llm_model", e.target.value)}
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              label="API Key"
+              value={translateConfig.llm_key || ""}
+              onChange={(e) => handleLLMConfigChange("llm_key", e.target.value)}
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+              type="password"
+            />
+            <TextField
+              label="提示词模板"
+              value={translateConfig.llm_prompt || ""}
+              onChange={(e) => handleLLMConfigChange("llm_prompt", e.target.value)}
+              size="small"
+              fullWidth
+              multiline
+              rows={3}
+              sx={{ mb: 2 }}
+              helperText="可用变量：{content} 原文 {lang} 目标语言"
+            />
+            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+              <TextField
+                label="最大请求速率"
+                value={translateConfig.llm_max_req_sec ?? 1}
+                onChange={(e) => handleLLMConfigChange("llm_max_req_sec", Number(e.target.value))}
+                size="small"
+                type="number"
+                sx={{ flex: 1 }}
+                helperText="根据 API 提供商限制设定"
+              />
+              <TextField
+                label="最大重试次数"
+                value={translateConfig.llm_max_try ?? 3}
+                onChange={(e) => handleLLMConfigChange("llm_max_try", Number(e.target.value))}
+                size="small"
+                type="number"
+                sx={{ flex: 1 }}
+                helperText="请求失败时重试"
+              />
+              <TextField
+                label="Temperature"
+                value={translateConfig.llm_temperature ?? 0.7}
+                onChange={(e) => handleLLMConfigChange("llm_temperature", Number(e.target.value))}
+                size="small"
+                type="number"
+                slotProps={{ htmlInput: { step: 0.1, min: 0, max: 2 } }}
+                sx={{ flex: 1 }}
+              />
+            </Box>
+          </Box>
+        );
+      }
+      if (cardTitle === "标题") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="title" label="标题语言" />
+            <Typography variant="body2" color="text.secondary">
+              将优先使用刮削网站的中文翻译，当刮削页面无中文时，才使用以下翻译方式。
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              翻译优先级：色花（内置标题数据）&gt; yesjav（在线色花数据）&gt; 翻译引擎
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              当存在色花中文标题时，即使刮削网站有中文翻译，也会使用色花中文标题
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "简介") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="outline" label="简介语言" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={getFieldConfig("outline").translate !== false}
+                  onChange={(e) => updateFieldTranslate("outline", e.target.checked)}
+                />
+              }
+              label="使用翻译引擎翻译简介"
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              当字段语言选择中文，但只刮削到日语时，可使用翻译引擎进行翻译
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "演员") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="actors" label="演员语言" />
+            <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                component="div"
+                sx={{ lineHeight: 1.8, whiteSpace: "pre-line" }}
+              >
+                {`素人和 FC2 番号演员可能是「素人」之类假名字，勾选「使用AV-wiki获取演员真实名字」，可以请求 AV-wiki 获取演员真实日文名，之后可使用映射表翻译为中文！
+
+演员名比较复杂，不能简单使用翻译引擎翻译。主要的问题：演员名翻译不准确、演员有多个名字、同一演员不同番号演员名不统一、各网站使用的演员名不统一等。
+
+不过，通过演员名映射翻译表可以解决这些问题，使刮削后的演员名整齐统一。
+实现逻辑：刮削网站获取演员名后，通过查询映射表中的匹配词来映射对应输出词。
+
+演员名映射翻译表文件名为：mapping_actor.xml
+· Windows位置：\\配置文件目录\\userdata\\mapping_actor.xml
+· Mac位置：/配置文件目录/userdata/mapping_actor.xml`}
+              </Typography>
+            </Box>
+          </Box>
+        );
+      }
+      if (cardTitle === "标签") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="tags" label="标签语言" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={getFieldConfig("tags").translate !== false}
+                  onChange={(e) => updateFieldTranslate("tags", e.target.checked)}
+                />
+              }
+              label="使用信息映射表翻译标签"
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              映射表文件名：mapping_info.xml。作用和演员映射表类似，说明可参考演员映射表。
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "系列") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="series" label="系列语言" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={getFieldConfig("series").translate !== false}
+                  onChange={(e) => updateFieldTranslate("series", e.target.checked)}
+                />
+              }
+              label="使用信息映射表翻译系列"
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              映射表文件名：mapping_info.xml。作用和演员映射表类似，说明可参考演员映射表。
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "片商") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="studio" label="片商语言" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={getFieldConfig("studio").translate !== false}
+                  onChange={(e) => updateFieldTranslate("studio", e.target.checked)}
+                />
+              }
+              label="使用信息映射表翻译片商"
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              映射表文件名：mapping_info.xml。作用和演员映射表类似，说明可参考演员映射表。
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "发行商") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="publisher" label="发行商语言" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={getFieldConfig("publisher").translate !== false}
+                  onChange={(e) => updateFieldTranslate("publisher", e.target.checked)}
+                />
+              }
+              label="使用信息映射表翻译发行商"
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              映射表文件名：mapping_info.xml。作用和演员映射表类似，说明可参考演员映射表。
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "导演") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <LanguageSelect fieldKey="directors" label="导演语言" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={getFieldConfig("directors").translate !== false}
+                  onChange={(e) => updateFieldTranslate("directors", e.target.checked)}
+                />
+              }
+              label="使用信息映射表翻译导演"
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              映射表文件名：mapping_info.xml。作用和演员映射表类似，说明可参考演员映射表。
+            </Typography>
+          </Box>
         );
       }
     }
@@ -1309,17 +1927,43 @@ function SettingsComponent() {
     if (tabId === "subtitle") {
       if (cardTitle === "中文字幕字符规则") {
         return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            设置用于判断和命名中文字幕文件的字符规则。判断字符用于识别是否为中文字幕，命名字符用于输出文件名。
-          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>中文字幕判断字符：</strong>指视频文件路径中含有以上字符时，视为该文件有中文字幕，多个以逗号分割。
+              此外，还会查找同目录是否存在同名字幕文件、nfo 的标签是否有中文字幕字样
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>中文字幕命名字符：</strong>
+              指视频有中文字幕时，在重命名文件名及目录名时在番号后添加该字符表示有中文字幕。 你也可以使用 cnword
+              字段来调整添加位置
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              <strong>添加中文字幕字符：</strong>选择将中文字幕标识添加到视频目录名或视频文件名
+            </Typography>
+          </Box>
         );
       }
       if (cardTitle === "添加外挂字幕") {
         return (
           <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              从指定字幕目录中查找匹配的字幕文件，自动添加到视频同目录下。支持批量字幕包。
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              刮削时，如果视频无内嵌字幕且同目录无字幕文件，则从字幕文件目录查找并复制字幕。
+              下载字幕包解压，填写字幕文件目录的路径。
             </Typography>
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1, mb: 2 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                component="div"
+                sx={{ lineHeight: 1.8, whiteSpace: "pre-line" }}
+              >
+                {`当字幕文件目录为空时，将只检查并统计无字幕的视频列表
+当视频已识别为有字幕状态时（已有字幕或包含中文字幕字符等），不会重复添加字幕
+当视频添加新的外挂字幕后，如勾选重新刮削，将在添加结束后自动刮削
+当视频之前添加了外挂字幕，但是还没有重新刮削时，这时也会自动刮削
+当勾选添加.chs后缀时，字幕文件会被统一命名为：视频文件名.chs.srt`}
+              </Typography>
+            </Box>
             <Button
               variant="outlined"
               startIcon={<SubtitlesIcon />}
@@ -1335,42 +1979,87 @@ function SettingsComponent() {
 
     // Tab 8: 水印
     if (tabId === "watermark") {
-      if (cardTitle === "自定义水印样式") {
-        return (
-          <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
-            <Typography variant="body2" color="text.secondary" component="div" sx={{ lineHeight: 1.8 }}>
-              <p>可自定义水印图片包，放置于配置目录的 Watermarks 文件夹中。</p>
-              <p>水印图片命名: sub.png (字幕), youma.png (有码), leak.png (流出), umr.png (破解), uncensored.png (无码), hd.png (高清)</p>
-            </Typography>
-          </Box>
-        );
-      }
       if (cardTitle === "水印设置") {
         return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            选择需要添加水印的图片类型和水印种类。水印大小建议 3-8 之间。
-          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Emby 中 fanart 作为背景图，不需要添加水印。其他软件作为预览图时，可添加水印
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              水印图片的显示高度 = 设置的水印大小 / 40 * 封面图高度
+            </Typography>
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                component="div"
+                sx={{ lineHeight: 1.8, whiteSpace: "pre-line" }}
+              >
+                {`水印分为字幕水印、马赛克水印、4K/8K水印。
+马赛克水印有四个：有码、破解、流出、无码，将按优先级显示其中一种状态
+马赛克水印优先级：有码 > 破解 > 流出 > 无码
+举例：如果视频是流出版本
+·当流出和无码都勾选时，会显示流出水印
+·当流出未勾选，无码已勾选，会显示无码水印
+·当流出和无码都不勾选时，则不显示水印`}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+              注意：不固定位置时，4K/8K 水印会使用固定位置方式，并自动挤开其他水印
+            </Typography>
+          </Box>
         );
       }
       if (cardTitle === "不固定位置") {
         return (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            从首个水印位置开始，顺时针方向依次添加多个水印。
-          </Typography>
-        );
-      }
-      if (cardTitle === "固定不同位置") {
-        return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            分别为不同种类的水印（4K/8K、字幕、马赛克）设置固定位置。
+            将从首个水印位置开始，顺时针方向依次添加其他水印
           </Typography>
         );
       }
       if (cardTitle === "固定一个位置") {
         return (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            所有水印在指定位置依次横向显示。
+            水印在指定位置依次横向显示
           </Typography>
+        );
+      }
+      if (cardTitle === "固定不同位置") {
+        return (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            可单独设置 4K/8K 水印、字幕水印和马赛克水印的位置
+          </Typography>
+        );
+      }
+      if (cardTitle === "自定义水印样式") {
+        return (
+          <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              component="div"
+              sx={{ lineHeight: 1.8, whiteSpace: "pre-line" }}
+            >
+              {`1、下载水印图片包并解压（也可以使用自己的图片），水印图片的保存路径为：
+· Windows位置：（配置文件目录在「设置」-「高级」中设置）
+  字幕水印：\\配置文件目录\\userdata\\watermark\\sub.png
+  有码水印：\\配置文件目录\\userdata\\watermark\\youma.png
+  破解水印：\\配置文件目录\\userdata\\watermark\\umr.png
+  流出水印：\\配置文件目录\\userdata\\watermark\\leak.png
+  无码水印：\\配置文件目录\\userdata\\watermark\\wuma.png
+  4K水印：\\配置文件目录\\userdata\\watermark\\4k.png
+  8K水印：\\配置文件目录\\userdata\\watermark\\8k.png
+· Mac位置：
+  字幕水印：/配置文件目录/userdata/watermark/sub.png
+  有码水印：/配置文件目录/userdata/watermark/youma.png
+  （其他同上）
+
+2、水印图片显示的逻辑：
+· 首先计算水印图片的显示高度 = 封面图高度 * 设置的水印大小 / 40
+  比如水印大小设置为 5，则水印图片的高度会缩放为封面图高度的 5/40
+· 然后根据水印图片的显示高度，和水印图片的宽高比，计算水印图片的显示宽度`}
+            </Typography>
+          </Box>
         );
       }
     }
@@ -1379,30 +2068,230 @@ function SettingsComponent() {
     if (tabId === "nfo") {
       if (cardTitle === "写入 NFO 的字段") {
         return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            选择需要写入 NFO 文件的字段。NFO 文件包含视频的元数据信息，供 Emby/Jellyfin 等媒体服务器读取。
-          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              注：同一字段多个名称可以兼容更多类型版本的媒体库
+            </Typography>
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" component="div" sx={{ lineHeight: 1.8 }}>
+                <p>
+                  <strong>标签内容选择：</strong>
+                  请勾选写入标签的信息（番号前缀、演员、分辨率、中文字幕、有码/无码、系列、片商、发行商）
+                </p>
+                <p>
+                  <strong>演员名白名单：</strong>仅在白名单内的演员名才会被添加至标签（多个内容以 |
+                  分割），留空表示全部添加
+                </p>
+                <p>
+                  <strong>注意：</strong>如果需要繁体，请到「设置」-「翻译」-「标签」，勾选为繁体！
+                </p>
+              </Typography>
+            </Box>
+          </Box>
         );
       }
     }
 
     // Tab 11: 网络
     if (tabId === "network") {
+      if (cardTitle === "网络设置") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              支持 http(s), socks5(h) 代理。示例：http://127.0.0.1:7897
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              需要用户名和密码时格式为：schema://username:password@host:port
+            </Typography>
+          </Box>
+        );
+      }
       if (cardTitle === "Cookie设置") {
         return (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            部分网站需要登录后才能访问完整信息。请在浏览器中登录后，复制 Cookie 值到此处。
-          </Typography>
+          <Box sx={{ mt: 1, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>javdb:</strong> 刮削 FC2 需要填写
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <strong>javbus:</strong> 美国节点需要填写，其他节点一般不需要填写，除非提示需
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              component="div"
+              sx={{ lineHeight: 1.8, mt: 2, whiteSpace: "pre-line" }}
+            >
+              {`Cookie 获取方法：
+1、使用 Chrome 打开目标网站并登录，在页面空白位置点击鼠标右键，选择「检查」；
+2、右侧弹窗顶部选择：「网络」->「全部」，然后刷新当前页面;
+3、点击「名称」栏新加载出来的第一个内容 ->「标头」->「请求表头」->「Cookie」;
+4、复制 Cookie 对应的全部值填入上面输入框。(不要直接右键点「复制值」!!!! 一定要先用鼠标「手动框选」要复制的全部文字，然后再右键点「复制」!!! 不是「复制值」!!!!)
+（注意：Cookie 存在有效期，过期无效时请重新获取。）`}
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "API Token") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              ThePornDB: https://theporndb.net/ 注册登录后，点头像 - API Tokens - CREATE。复制生成的 API Token
+              填入此处。
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              该网站的 Hash 值匹配结果可能错误
+            </Typography>
+          </Box>
+        );
+      }
+      if (cardTitle === "网站设置") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              可在下方设置选定网站的配置。
+            </Typography>
+            <Typography variant="body2" color="error.main" sx={{ mt: 1, fontWeight: 600 }}>
+              ⚠️ 切换网站前需先保存，否则不会生效
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              注意：当前并非所有网站均支持这些配置，某些设置可能无效
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              自定义网址：自定义指定网站的网址，刮削时将用其代替默认网址
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              使用浏览器请求：必须安装 Chrome 浏览器。可处理某些无法获取的网站，内存占用会显著提高
+            </Typography>
+          </Box>
         );
       }
     }
 
     // Tab 12: 高级
     if (tabId === "advanced") {
+      if (cardTitle === "定时刮削") {
+        const switchOn = (formData.switch_on as string[]) || [];
+        const timedEnabled = switchOn.includes("timed_scrape");
+        const timedInterval = (formData.timed_interval as number) || 60;
+
+        const handleTimedToggle = (checked: boolean) => {
+          const newSwitchOn = checked
+            ? [...switchOn.filter((s) => s !== "timed_scrape"), "timed_scrape"]
+            : switchOn.filter((s) => s !== "timed_scrape");
+          handleChange({ formData: { ...formData, switch_on: newSwitchOn } });
+        };
+
+        const handleTimedIntervalChange = (value: string) => {
+          const numValue = Number.parseInt(value, 10);
+          if (!Number.isNaN(numValue) && numValue >= 0) {
+            handleChange({ formData: { ...formData, timed_interval: numValue } });
+          }
+        };
+
+        return (
+          <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <FormControlLabel
+                control={<Checkbox checked={timedEnabled} onChange={(e) => handleTimedToggle(e.target.checked)} />}
+                label="每隔"
+              />
+              <TextField
+                type="number"
+                value={timedInterval}
+                onChange={(e) => handleTimedIntervalChange(e.target.value)}
+                size="small"
+                disabled={!timedEnabled}
+                sx={{ width: 100 }}
+                slotProps={{ htmlInput: { min: 1 } }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                分钟自动开始刮削（读取配置时开始计时）
+              </Typography>
+            </Box>
+          </Box>
+        );
+      }
+
+      if (cardTitle === "间歇刮削") {
+        const switchOn = (formData.switch_on as string[]) || [];
+        const restEnabled = switchOn.includes("rest_scrape");
+        const restCount = (formData.rest_count as number) || 10;
+        const restTime = (formData.rest_time as number) || 20;
+
+        const handleRestToggle = (checked: boolean) => {
+          const newSwitchOn = checked
+            ? [...switchOn.filter((s) => s !== "rest_scrape"), "rest_scrape"]
+            : switchOn.filter((s) => s !== "rest_scrape");
+          handleChange({ formData: { ...formData, switch_on: newSwitchOn } });
+        };
+
+        const handleRestCountChange = (value: string) => {
+          const numValue = Number.parseInt(value, 10);
+          if (!Number.isNaN(numValue) && numValue >= 0) {
+            handleChange({ formData: { ...formData, rest_count: numValue } });
+          }
+        };
+
+        const handleRestTimeChange = (value: string) => {
+          const numValue = Number.parseInt(value, 10);
+          if (!Number.isNaN(numValue) && numValue >= 0) {
+            handleChange({ formData: { ...formData, rest_time: numValue } });
+          }
+        };
+
+        return (
+          <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <FormControlLabel
+                control={<Checkbox checked={restEnabled} onChange={(e) => handleRestToggle(e.target.checked)} />}
+                label="连续刮削"
+              />
+              <TextField
+                type="number"
+                value={restCount}
+                onChange={(e) => handleRestCountChange(e.target.value)}
+                size="small"
+                disabled={!restEnabled}
+                sx={{ width: 80 }}
+                slotProps={{ htmlInput: { min: 1 } }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                个后休息
+              </Typography>
+              <TextField
+                type="number"
+                value={restTime}
+                onChange={(e) => handleRestTimeChange(e.target.value)}
+                size="small"
+                disabled={!restEnabled}
+                sx={{ width: 80 }}
+                slotProps={{ htmlInput: { min: 1 } }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                秒
+              </Typography>
+            </Box>
+          </Box>
+        );
+      }
+
+      if (cardTitle === "高级功能") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              配置文件目录：将读取该目录中的配置文件、映射表、水印图片、演员头像等数据，修改后重启程序方可生效
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              保留任务：记住未完成的刮削任务，即使退出或中止，下次仍可继续刮削未完成任务
+            </Typography>
+          </Box>
+        );
+      }
+
       if (cardTitle === "调试模式（日志页面）") {
         return (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            启用后，日志页面将显示更详细的刮削过程信息，便于排查问题。
+            显示刮削过程信息、字段来源信息、字段内容信息，便于排查问题。
           </Typography>
         );
       }
@@ -1412,81 +2301,116 @@ function SettingsComponent() {
     if (tabId === "actor") {
       if (cardTitle === "Emby/Jellyfin 设置") {
         return (
-          <Box sx={{ mt: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>查看信息</InputLabel>
-              <Select
-                value={actorListFilterMode}
-                label="查看信息"
-                onChange={(e) => setActorListFilterMode(e.target.value as number)}
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              服务器地址：指你的 Emby/Jellyfin 服务器地址，比如：http://192.168.1.5:8096
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              API 密钥创建方法：控制台-&gt;高级-&gt;API 密钥-&gt;添加（APP 名称任意）
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              用户 ID：如果设置，将仅获取指定 Emby/Jellyfin 用户媒体库中的演员
+            </Typography>
+            <Box sx={{ mt: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel>查看信息</InputLabel>
+                <Select
+                  value={actorListFilterMode}
+                  label="查看信息"
+                  onChange={(e) => setActorListFilterMode(e.target.value as number)}
+                >
+                  <MenuItem value={0}>所有演员</MenuItem>
+                  <MenuItem value={1}>有头像有信息</MenuItem>
+                  <MenuItem value={2}>没头像有信息</MenuItem>
+                  <MenuItem value={3}>有头像没信息</MenuItem>
+                  <MenuItem value={4}>没头像没信息</MenuItem>
+                  <MenuItem value={5}>有信息</MenuItem>
+                  <MenuItem value={6}>没信息</MenuItem>
+                  <MenuItem value={7}>有头像</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                startIcon={<SearchIcon />}
+                onClick={handleShowActorList}
+                disabled={showActorList.isPending}
               >
-                <MenuItem value={0}>所有演员</MenuItem>
-                <MenuItem value={1}>有头像有信息</MenuItem>
-                <MenuItem value={2}>没头像有信息</MenuItem>
-                <MenuItem value={3}>有头像没信息</MenuItem>
-                <MenuItem value={4}>没头像没信息</MenuItem>
-                <MenuItem value={5}>有信息</MenuItem>
-                <MenuItem value={6}>没信息</MenuItem>
-                <MenuItem value={7}>有头像</MenuItem>
-              </Select>
-            </FormControl>
+                查看
+              </Button>
+            </Box>
+          </Box>
+        );
+      }
+      if (cardTitle === "补全 Emby/Jellyfin 演员信息") {
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              使用维基百科补全 Emby/Jellyfin 演员信息，包括：演员介绍、资料、简历、生平、Imdb主页等。
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              不存在中文时，翻译日语为中文（不勾选则无中文时使用日语）
+            </Typography>
             <Button
               variant="outlined"
-              startIcon={<SearchIcon />}
-              onClick={handleShowActorList}
-              disabled={showActorList.isPending}
+              startIcon={<PersonIcon />}
+              onClick={handleCompleteActors}
+              disabled={completeActors.isPending}
+              sx={{ mt: 2 }}
             >
-              查看
+              开始补全
             </Button>
           </Box>
         );
       }
       if (cardTitle === "补全 Emby/Jellyfin 演员头像") {
         return (
-          <Button
-            variant="outlined"
-            startIcon={<PhotoIcon />}
-            onClick={handleUpdateActorPhotos}
-            disabled={updateActorPhotos.isPending}
-            sx={{ mt: 2 }}
-          >
-            开始补全
-          </Button>
-        );
-      }
-      if (cardTitle === "补全 Emby/Jellyfin 演员信息") {
-        return (
-          <Button
-            variant="outlined"
-            startIcon={<PersonIcon />}
-            onClick={handleCompleteActors}
-            disabled={completeActors.isPending}
-            sx={{ mt: 2 }}
-          >
-            开始补全
-          </Button>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              使用网络头像库或本地头像库，补全 Emby/Jellyfin 演员头像。
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              网络头像库 (Gfriends)：建议 Fork 该项目到你的 Github，当项目故障时，可填写你 Fork 后的项目地址
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              支持优先使用 Graphis.ne.jp 的图片作为演员头像和演员背景；Graphis.ne.jp 提供了演员不同时期的图片。
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<PhotoIcon />}
+              onClick={handleUpdateActorPhotos}
+              disabled={updateActorPhotos.isPending}
+              sx={{ mt: 2 }}
+            >
+              开始补全
+            </Button>
+          </Box>
         );
       }
       if (cardTitle === "补全 Kodi/Plex/Jvedio 演员头像") {
         return (
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<PhotoIcon />}
-              onClick={() => handleManageKodiActors("add")}
-              disabled={manageKodiActors.isPending}
-            >
-              开始补全
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={() => handleManageKodiActors("del")}
-              disabled={manageKodiActors.isPending}
-            >
-              清除所有 .actors 文件夹
-            </Button>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              将为待刮削目录的每个视频在同目录创建一个 .actors 文件夹，并将该视频的演员图片放在该文件夹中
+            </Typography>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<PhotoIcon />}
+                onClick={() => handleManageKodiActors("add")}
+                disabled={manageKodiActors.isPending}
+              >
+                开始补全
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={() => handleManageKodiActors("del")}
+                disabled={manageKodiActors.isPending}
+              >
+                清除所有 .actors 文件夹
+              </Button>
+            </Box>
           </Box>
         );
       }
@@ -1688,7 +2612,7 @@ function SettingsComponent() {
         <TabPanel key={tab.id} value={currentTab} index={index}>
           <Grid container spacing={3}>
             {tab.groups.map((group) => (
-              <Grid key={group.title} size={{ xs: 12, lg: group.fields.length > 3 ? 12 : 6 }}>
+              <Grid key={group.title} size={{ xs: 12, lg: group.halfWidth || group.fields.length <= 3 ? 6 : 12 }}>
                 <GroupCard
                   group={group}
                   schema={schema}
